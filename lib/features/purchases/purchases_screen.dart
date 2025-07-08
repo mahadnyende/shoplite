@@ -18,6 +18,176 @@ class PurchasesScreen extends StatefulWidget {
 }
 
 class _PurchasesScreenState extends State<PurchasesScreen> {
+  Future<pw.Document> _generateInvoicePdf(
+    Map<String, dynamic> purchase,
+    List<Map<String, dynamic>> items,
+    String businessName,
+    String businessAddress,
+    String businessContact,
+  ) async {
+    final pdf = pw.Document();
+    final now = DateTime.now();
+    final font = await PdfGoogleFonts.notoSansRegular();
+    final fontBold = await PdfGoogleFonts.notoSansBold();
+    pdf.addPage(
+      pw.Page(
+        margin: const pw.EdgeInsets.all(32),
+        theme: pw.ThemeData.withFont(base: font, bold: fontBold),
+        build: (pw.Context context) => pw.Column(
+          crossAxisAlignment: pw.CrossAxisAlignment.start,
+          children: [
+            pw.Row(
+              mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+              children: [
+                pw.Column(
+                  crossAxisAlignment: pw.CrossAxisAlignment.start,
+                  children: [
+                    pw.Text(
+                      businessName,
+                      style: pw.TextStyle(
+                        fontSize: 22,
+                        fontWeight: pw.FontWeight.bold,
+                      ),
+                    ),
+                    pw.Text(businessAddress),
+                    pw.Text(businessContact),
+                  ],
+                ),
+                pw.Container(
+                  padding: const pw.EdgeInsets.all(8),
+                  decoration: pw.BoxDecoration(
+                    border: pw.Border.all(color: PdfColors.blue, width: 2),
+                    borderRadius: pw.BorderRadius.circular(8),
+                  ),
+                  child: pw.Text(
+                    'INVOICE',
+                    style: pw.TextStyle(
+                      fontSize: 18,
+                      color: PdfColors.blue,
+                      fontWeight: pw.FontWeight.bold,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            pw.Divider(),
+            pw.SizedBox(height: 8),
+            pw.Row(
+              mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+              children: [
+                pw.Text(
+                  'Invoice #: ${purchase['id']}',
+                  style: pw.TextStyle(fontWeight: pw.FontWeight.bold),
+                ),
+                pw.Text('Date: ${purchase['date']}'),
+              ],
+            ),
+            pw.SizedBox(height: 4),
+            pw.Text('Supplier: ${purchase['supplier']}'),
+            pw.Text('Payment Status: ${purchase['payment_status']}'),
+            pw.Text('Delivery Status: ${purchase['delivery_status'] == 'Not Received' ? 'Not Received' : purchase['delivery_status']}'),
+            if ((purchase['notes'] ?? '').toString().isNotEmpty)
+              pw.Text('Notes: ${purchase['notes']}'),
+            pw.SizedBox(height: 12),
+            pw.Text(
+              'Items',
+              style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 14),
+            ),
+            pw.Table.fromTextArray(
+              headers: ['Stock', 'Qty', 'Price', 'Total'],
+              headerStyle: pw.TextStyle(
+                fontWeight: pw.FontWeight.bold,
+                color: PdfColors.white,
+              ),
+              headerDecoration: pw.BoxDecoration(color: PdfColors.blueGrey800),
+              cellAlignment: pw.Alignment.centerLeft,
+              cellStyle: pw.TextStyle(fontSize: 10),
+              border: pw.TableBorder.all(color: PdfColors.grey600, width: 0.5),
+              data: items
+                  .map(
+                    (item) => [
+                      item['stock_name']?.toString() ?? '',
+                      item['qty']?.toString() ?? '',
+                      item['purchase_price']?.toString() ?? '',
+                      item['total']?.toString() ?? '',
+                    ],
+                  )
+                  .toList(),
+            ),
+            pw.SizedBox(height: 12),
+            pw.Row(
+              mainAxisAlignment: pw.MainAxisAlignment.end,
+              children: [
+                pw.Column(
+                  crossAxisAlignment: pw.CrossAxisAlignment.start,
+                  children: [
+                    pw.Text(
+                      'Total: UGX ${purchase['total'] ?? 0}',
+                      style: pw.TextStyle(fontWeight: pw.FontWeight.bold),
+                    ),
+                    pw.Text(
+                      'Paid: UGX ${purchase['amount_paid'] ?? 0}',
+                      style: pw.TextStyle(fontWeight: pw.FontWeight.bold),
+                    ),
+                    pw.Text(
+                      'Balance: UGX ${(purchase['total'] ?? 0) - (purchase['amount_paid'] ?? 0)}',
+                      style: pw.TextStyle(fontWeight: pw.FontWeight.bold),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+            pw.Spacer(),
+            pw.Divider(),
+            pw.Row(
+              mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+              children: [
+                pw.Text(
+                  'Generated: ${DateFormat('yyyy-MM-dd HH:mm').format(now)}',
+                ),
+                pw.Text('Page 1 of 1'),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+    return pdf;
+  }
+
+  Future<void> _showPaymentDialog(Map<String, dynamic> purchase) async {
+    // TODO: Implement payment dialog logic
+    await showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text('Payment'),
+        content: Text('Payment dialog not implemented.'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: Text('Close'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _showReceiveGoodsDialog(Map<String, dynamic> purchase) async {
+    // TODO: Implement receive goods dialog logic
+    await showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text('Receive Goods'),
+        content: Text('Receive goods dialog not implemented.'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: Text('Close'),
+          ),
+        ],
+      ),
+    );
+  }
   int? hoveredRowIndex;
   List<Map<String, dynamic>> purchases = [];
   String businessName = 'Your Business Name';
@@ -540,12 +710,643 @@ class _PurchasesScreenState extends State<PurchasesScreen> {
   }
 
   Future<void> _showViewInvoiceDialog(Map<String, dynamic> purchase) async {
-    // Implementation from previous version (not shown here for brevity)
-    // You can copy the full dialog code from your backup or previous file version.
+    await _loadBusinessDetails();
+    final db = await AppDatabase.database;
+    final List<Map<String, dynamic>> items = await db.query(
+      'purchase_items',
+      where: 'purchase_id = ?',
+      whereArgs: [purchase['id']],
+    );
+    final balance = (purchase['total'] ?? 0) - (purchase['amount_paid'] ?? 0);
+    await showDialog(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: Row(
+            children: [
+              Icon(MdiIcons.receipt, color: Colors.blue, size: 28),
+              SizedBox(width: 8),
+              Text('Invoice #${purchase['id']}'),
+            ],
+          ),
+          content: SingleChildScrollView(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Business and Invoice Info
+                Container(
+                  padding: EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: Colors.blueGrey[50],
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(businessName, style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                      Text(businessAddress, style: TextStyle(color: Colors.blueGrey[700], fontSize: 13)),
+                      Text(businessContact, style: TextStyle(color: Colors.blueGrey[700], fontSize: 13)),
+                      Divider(height: 18),
+                      Row(
+                        children: [
+                          Icon(MdiIcons.account, size: 18, color: Colors.blueGrey),
+                          SizedBox(width: 4),
+                          Text('Supplier: ', style: TextStyle(fontWeight: FontWeight.bold)),
+                          Text('${purchase['supplier']}'),
+                          Spacer(),
+                          Icon(MdiIcons.calendar, size: 18, color: Colors.blueGrey),
+                          SizedBox(width: 4),
+                          Text('Date: ', style: TextStyle(fontWeight: FontWeight.bold)),
+                          Text('${purchase['date']}'),
+                        ],
+                      ),
+                      SizedBox(height: 6),
+                      Row(
+                        children: [
+                          Icon(MdiIcons.cashMultiple, size: 18, color: Colors.green),
+                          SizedBox(width: 4),
+                          Text('Payment: ', style: TextStyle(fontWeight: FontWeight.bold)),
+                          Chip(
+                            label: Text(purchase['payment_status'] ?? ''),
+                            backgroundColor: purchase['payment_status'] == 'Fully Paid'
+                                ? Colors.green.shade100
+                                : purchase['payment_status'] == 'Partially Paid'
+                                    ? Colors.orange.shade100
+                                    : Colors.red.shade100,
+                            labelStyle: TextStyle(
+                              color: purchase['payment_status'] == 'Fully Paid'
+                                  ? Colors.green.shade900
+                                  : purchase['payment_status'] == 'Partially Paid'
+                                      ? Colors.orange.shade900
+                                      : Colors.red.shade900,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                          Spacer(),
+                          Icon(MdiIcons.truckDelivery, size: 18, color: Colors.blue),
+                          SizedBox(width: 4),
+                          Text('Delivery: ', style: TextStyle(fontWeight: FontWeight.bold)),
+                          Chip(
+                            label: Text(
+                              purchase['delivery_status'] == 'Not Received'
+                                  ? 'Not Received'
+                                  : purchase['delivery_status'] ?? ''),
+                            backgroundColor: purchase['delivery_status'] == 'Fully Received'
+                                ? Colors.green.shade100
+                                : purchase['delivery_status'] == 'Partially Received'
+                                    ? Colors.orange.shade100
+                                    : Colors.red.shade100,
+                            labelStyle: TextStyle(
+                              color: purchase['delivery_status'] == 'Fully Received'
+                                  ? Colors.green.shade900
+                                  : purchase['delivery_status'] == 'Partially Received'
+                                      ? Colors.orange.shade900
+                                      : Colors.red.shade900,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ],
+                      ),
+                      if ((purchase['notes'] ?? '').toString().isNotEmpty)
+                        Padding(
+                          padding: const EdgeInsets.only(top: 6.0),
+                          child: Row(
+                            children: [
+                              Icon(MdiIcons.noteTextOutline, size: 18, color: Colors.amber[800]),
+                              SizedBox(width: 4),
+                              Text('Notes: ', style: TextStyle(fontWeight: FontWeight.bold)),
+                              Expanded(child: Text('${purchase['notes']}', maxLines: 2, overflow: TextOverflow.ellipsis)),
+                            ],
+                          ),
+                        ),
+                    ],
+                  ),
+                ),
+                SizedBox(height: 16),
+                // Action Buttons
+                Center(
+                  child: Wrap(
+                    spacing: 8,
+                    runSpacing: 4,
+                    children: [
+                      Tooltip(
+                        message: 'Print Invoice',
+                        child: ElevatedButton.icon(
+                          icon: Icon(MdiIcons.printer),
+                          label: Text('Print'),
+                          style: ElevatedButton.styleFrom(backgroundColor: Colors.blue),
+                          onPressed: () async {
+                            await _loadBusinessDetails();
+                            final db = await AppDatabase.database;
+                            final List<Map<String, dynamic>> items = await db.query(
+                              'purchase_items',
+                              where: 'purchase_id = ?',
+                              whereArgs: [purchase['id']],
+                            );
+                            final pdf = await _generateInvoicePdf(
+                              purchase,
+                              items,
+                              businessName,
+                              businessAddress,
+                              businessContact,
+                            );
+                            await Printing.layoutPdf(onLayout: (format) => pdf.save());
+                          },
+                        ),
+                      ),
+                      Tooltip(
+                        message: 'Export to PDF',
+                        child: ElevatedButton.icon(
+                          icon: Icon(MdiIcons.filePdfBox),
+                          label: Text('Export'),
+                          style: ElevatedButton.styleFrom(backgroundColor: Colors.deepPurple),
+                          onPressed: () async {
+                            await _loadBusinessDetails();
+                            final db = await AppDatabase.database;
+                            final List<Map<String, dynamic>> items = await db.query(
+                              'purchase_items',
+                              where: 'purchase_id = ?',
+                              whereArgs: [purchase['id']],
+                            );
+                            final pdf = await _generateInvoicePdf(
+                              purchase,
+                              items,
+                              businessName,
+                              businessAddress,
+                              businessContact,
+                            );
+                            await Printing.sharePdf(
+                              bytes: await pdf.save(),
+                              filename: 'invoice_${purchase['id']}.pdf',
+                            );
+                          },
+                        ),
+                      ),
+                      Tooltip(
+                        message: 'Edit Invoice',
+                        child: ElevatedButton.icon(
+                          icon: Icon(MdiIcons.pencil),
+                          label: Text('Edit'),
+                          style: ElevatedButton.styleFrom(backgroundColor: Colors.orange),
+                          onPressed: () => _showEditPurchaseDialog(purchase),
+                        ),
+                      ),
+                      Tooltip(
+                        message: 'Pay',
+                        child: ElevatedButton.icon(
+                          icon: Icon(MdiIcons.cash),
+                          label: Text('Pay'),
+                          style: ElevatedButton.styleFrom(backgroundColor: Colors.green),
+                          onPressed: (purchase['payment_status'] == 'Fully Paid')
+                              ? null
+                              : () => _showPaymentDialog(purchase),
+                        ),
+                      ),
+                      Tooltip(
+                        message: 'Receive Items',
+                        child: ElevatedButton.icon(
+                          icon: Icon(MdiIcons.packageVariant),
+                          label: Text('Receive'),
+                          style: ElevatedButton.styleFrom(backgroundColor: Colors.teal),
+                          onPressed: () => _showReceiveGoodsDialog(purchase),
+                        ),
+                      ),
+                      Tooltip(
+                        message: 'Delete Invoice',
+                        child: ElevatedButton.icon(
+                          icon: Icon(MdiIcons.delete),
+                          label: Text('Delete'),
+                          style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+                          onPressed: () async {
+                            final confirm = await showDialog<bool>(
+                              context: context,
+                              builder: (context) => AlertDialog(
+                                title: Text('Confirm Delete'),
+                                content: Text(
+                                  'Are you sure you want to delete this invoice? This action cannot be undone.',
+                                ),
+                                actions: [
+                                  TextButton(
+                                    onPressed: () => Navigator.of(context).pop(false),
+                                    child: Text('Cancel'),
+                                  ),
+                                  ElevatedButton(
+                                    style: ElevatedButton.styleFrom(
+                                      backgroundColor: Colors.red,
+                                    ),
+                                    onPressed: () => Navigator.of(context).pop(true),
+                                    child: Text('Delete'),
+                                  ),
+                                ],
+                              ),
+                            );
+                            if (confirm == true) {
+                              final db = await AppDatabase.database;
+                              await db.delete(
+                                'purchase_items',
+                                where: 'purchase_id = ?',
+                                whereArgs: [purchase['id']],
+                              );
+                              await db.delete(
+                                'purchases',
+                                where: 'id = ?',
+                                whereArgs: [purchase['id']],
+                              );
+                              await _loadPurchases();
+                            }
+                          },
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                SizedBox(height: 18),
+                // Items Table
+                Card(
+                  elevation: 2,
+                  margin: EdgeInsets.zero,
+                  child: Padding(
+                    padding: const EdgeInsets.all(8.0),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            Expanded(child: Text('Item', style: TextStyle(fontWeight: FontWeight.bold))),
+                            SizedBox(width: 8),
+                            Text('Qty', style: TextStyle(fontWeight: FontWeight.bold)),
+                            SizedBox(width: 8),
+                            Text('Price', style: TextStyle(fontWeight: FontWeight.bold)),
+                            SizedBox(width: 8),
+                            Text('Total', style: TextStyle(fontWeight: FontWeight.bold)),
+                          ],
+                        ),
+                        Divider(),
+                        ...items.map(
+                          (item) => Padding(
+                            padding: const EdgeInsets.symmetric(vertical: 2.0),
+                            child: Row(
+                              children: [
+                                Expanded(child: Text(item['stock_name'] ?? '')),
+                                SizedBox(width: 8),
+                                Text('${item['qty']}', style: TextStyle(fontFeatures: [FontFeature.tabularFigures()])),
+                                SizedBox(width: 8),
+                                Text('UGX ${item['purchase_price']}', style: TextStyle(fontFeatures: [FontFeature.tabularFigures()])),
+                                SizedBox(width: 8),
+                                Text('UGX ${item['total']}', style: TextStyle(fontWeight: FontWeight.bold, fontFeatures: [FontFeature.tabularFigures()])),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+                SizedBox(height: 18),
+                // Totals
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.end,
+                  children: [
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.end,
+                      children: [
+                        Text('Total: UGX ${purchase['total'] ?? 0}', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
+                        Text('Paid: UGX ${purchase['amount_paid'] ?? 0}', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
+                        Text('Balance: UGX $balance', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: balance > 0 ? Colors.red : Colors.green)),
+                      ],
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: Text('Close'),
+            ),
+          ],
+        );
+      },
+    );
   }
 
   Future<void> _showEditPurchaseDialog(Map<String, dynamic> purchase) async {
-    // Implementation from previous version (not shown here for brevity)
-    // You can copy the full dialog code from your backup or previous file version.
+    final db = await AppDatabase.database;
+    // Load purchase items
+    List<Map<String, dynamic>> items = List<Map<String, dynamic>>.from(
+      await db.query(
+        'purchase_items',
+        where: 'purchase_id = ?',
+        whereArgs: [purchase['id']],
+      ),
+    );
+    // Load inventory for stock names
+    List<Map<String, dynamic>> inventory = await AppDatabase.getInventory(
+      branchId: widget.branchId,
+    );
+    List<String> stockNames = inventory
+        .map((e) => e['name'] as String)
+        .toList();
+    final supplierController = TextEditingController(
+      text: purchase['supplier'] ?? '',
+    );
+    final notesController = TextEditingController(
+      text: purchase['notes'] ?? '',
+    );
+    DateTime selectedDate = DateFormat('yyyy-MM-dd').parse(purchase['date']);
+    int total = items.fold<int>(
+      0,
+      (sum, item) => sum + (item['total'] as int? ?? 0),
+    );
+
+    await showDialog(
+      context: context,
+      builder: (context) {
+        return StatefulBuilder(
+          builder: (context, setState) {
+            void updateItem(int i, String field, String value) {
+              setState(() {
+                if (field == 'qty') {
+                  items[i]['qty'] = int.tryParse(value) ?? 0;
+                  items[i]['total'] =
+                      (items[i]['qty'] as int) *
+                      (items[i]['purchase_price'] as int);
+                } else if (field == 'purchase_price') {
+                  items[i]['purchase_price'] = int.tryParse(value) ?? 0;
+                  items[i]['total'] =
+                      (items[i]['qty'] as int) *
+                      (items[i]['purchase_price'] as int);
+                }
+              });
+            }
+
+            total = items.fold<int>(
+              0,
+              (sum, item) => sum + (item['total'] as int? ?? 0),
+            );
+            return AlertDialog(
+              title: Row(
+                children: [
+                  Icon(MdiIcons.pencil, color: Colors.orange, size: 26),
+                  SizedBox(width: 8),
+                  Text('Edit Invoice #${purchase['id']}'),
+                ],
+              ),
+              content: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // Supplier and Date
+                    Card(
+                      color: Colors.blueGrey[50],
+                      margin: EdgeInsets.only(bottom: 12),
+                      child: Padding(
+                        padding: const EdgeInsets.all(10.0),
+                        child: Column(
+                          children: [
+                            Row(
+                              children: [
+                                Icon(MdiIcons.account, color: Colors.blueGrey, size: 20),
+                                SizedBox(width: 6),
+                                Expanded(
+                                  child: TextField(
+                                    controller: supplierController,
+                                    decoration: InputDecoration(labelText: 'Supplier'),
+                                  ),
+                                ),
+                              ],
+                            ),
+                            SizedBox(height: 8),
+                            Row(
+                              children: [
+                                Icon(MdiIcons.calendar, color: Colors.blueGrey, size: 18),
+                                SizedBox(width: 6),
+                                Text('Date: ', style: TextStyle(fontWeight: FontWeight.bold)),
+                                Text(DateFormat('yyyy-MM-dd').format(selectedDate)),
+                                IconButton(
+                                  icon: Icon(MdiIcons.calendarEdit),
+                                  onPressed: () async {
+                                    final picked = await showDatePicker(
+                                      context: context,
+                                      initialDate: selectedDate,
+                                      firstDate: DateTime(2000),
+                                      lastDate: DateTime(2100),
+                                    );
+                                    if (picked != null) {
+                                      setState(() {
+                                        selectedDate = picked;
+                                      });
+                                    }
+                                  },
+                                ),
+                              ],
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                    // Items Table
+                    if (items.isNotEmpty)
+                      Card(
+                        elevation: 1,
+                        margin: EdgeInsets.only(bottom: 12),
+                        child: Padding(
+                          padding: const EdgeInsets.all(8.0),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Row(
+                                children: [
+                                  Expanded(child: Text('Item', style: TextStyle(fontWeight: FontWeight.bold))),
+                                  SizedBox(width: 8),
+                                  Text('Qty', style: TextStyle(fontWeight: FontWeight.bold)),
+                                  SizedBox(width: 8),
+                                  Text('Price', style: TextStyle(fontWeight: FontWeight.bold)),
+                                  SizedBox(width: 8),
+                                  Text('Total', style: TextStyle(fontWeight: FontWeight.bold)),
+                                  SizedBox(width: 8),
+                                  SizedBox(width: 32), // For delete icon
+                                ],
+                              ),
+                              Divider(),
+                              ...items.asMap().entries.map((entry) {
+                                final i = entry.key;
+                                final item = entry.value;
+                                return Padding(
+                                  padding: const EdgeInsets.symmetric(vertical: 2.0),
+                                  child: Row(
+                                    children: [
+                                      Expanded(child: Text(item['stock_name'] ?? '')),
+                                      SizedBox(width: 8),
+                                      SizedBox(
+                                        width: 50,
+                                        child: TextField(
+                                          controller: TextEditingController(
+                                            text: item['qty'].toString(),
+                                          ),
+                                          keyboardType: TextInputType.number,
+                                          decoration: InputDecoration(isDense: true, contentPadding: EdgeInsets.symmetric(vertical: 6, horizontal: 6)),
+                                          onChanged: (v) => updateItem(i, 'qty', v),
+                                        ),
+                                      ),
+                                      SizedBox(width: 8),
+                                      SizedBox(
+                                        width: 70,
+                                        child: TextField(
+                                          controller: TextEditingController(
+                                            text: item['purchase_price'].toString(),
+                                          ),
+                                          keyboardType: TextInputType.number,
+                                          decoration: InputDecoration(isDense: true, contentPadding: EdgeInsets.symmetric(vertical: 6, horizontal: 6)),
+                                          onChanged: (v) => updateItem(i, 'purchase_price', v),
+                                        ),
+                                      ),
+                                      SizedBox(width: 8),
+                                      Text('UGX ${item['total']}', style: TextStyle(fontWeight: FontWeight.bold)),
+                                      SizedBox(width: 8),
+                                      IconButton(
+                                        icon: Icon(MdiIcons.trashCanOutline, color: Colors.red),
+                                        tooltip: 'Remove Item',
+                                        onPressed: () => setState(() {
+                                          items.removeAt(i);
+                                        }),
+                                      ),
+                                    ],
+                                  ),
+                                );
+                              }),
+                            ],
+                          ),
+                        ),
+                      ),
+                    // Notes
+                    Card(
+                      color: Colors.amber[50],
+                      margin: EdgeInsets.only(bottom: 12),
+                      child: Padding(
+                        padding: const EdgeInsets.all(10.0),
+                        child: Row(
+                          children: [
+                            Icon(MdiIcons.clipboardTextOutline, color: Colors.amber[800], size: 20),
+                            SizedBox(width: 6),
+                            Expanded(
+                              child: TextField(
+                                controller: notesController,
+                                decoration: InputDecoration(
+                                  labelText: 'Notes (optional)',
+                                  border: InputBorder.none,
+                                ),
+                                maxLines: 2,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                    // Total
+                    Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 8.0, horizontal: 2.0),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.end,
+                        children: [
+                          Text(
+                            'Total Invoice Value: UGX $total',
+                            style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.of(context).pop(),
+                  child: Text('Cancel'),
+                ),
+                ElevatedButton(
+                  style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+                  onPressed: () async {
+                    final confirm = await showDialog<bool>(
+                      context: context,
+                      builder: (context) => AlertDialog(
+                        title: Text('Confirm Delete'),
+                        content: Text(
+                          'Are you sure you want to delete this purchase? This action cannot be undone.',
+                        ),
+                        actions: [
+                          TextButton(
+                            onPressed: () => Navigator.of(context).pop(false),
+                            child: Text('Cancel'),
+                          ),
+                          ElevatedButton(
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: Colors.red,
+                            ),
+                            onPressed: () => Navigator.of(context).pop(true),
+                            child: Text('Delete'),
+                          ),
+                        ],
+                      ),
+                    );
+                    if (confirm != true) return;
+                    // Delete purchase and its items
+                    await db.delete(
+                      'purchase_items',
+                      where: 'purchase_id = ?',
+                      whereArgs: [purchase['id']],
+                    );
+                    await db.delete(
+                      'purchases',
+                      where: 'id = ?',
+                      whereArgs: [purchase['id']],
+                    );
+                    Navigator.of(context).pop();
+                    await _loadPurchases();
+                  },
+                  child: Text('Delete'),
+                ),
+                ElevatedButton(
+                  onPressed: () async {
+                    // Update purchase
+                    await db.update(
+                      'purchases',
+                      {
+                        'supplier': supplierController.text.trim(),
+                        'date': DateFormat('yyyy-MM-dd').format(selectedDate),
+                        'notes': notesController.text.trim(),
+                        'total': total,
+                      },
+                      where: 'id = ?',
+                      whereArgs: [purchase['id']],
+                    );
+                    // Update purchase items
+                    await db.delete(
+                      'purchase_items',
+                      where: 'purchase_id = ?',
+                      whereArgs: [purchase['id']],
+                    );
+                    for (final item in items) {
+                      await db.insert('purchase_items', {
+                        'purchase_id': purchase['id'],
+                        'stock_name': item['stock_name'],
+                        'qty': item['qty'],
+                        'purchase_price': item['purchase_price'],
+                        'total': item['total'],
+                      });
+                    }
+                    Navigator.of(context).pop();
+                    await _loadPurchases();
+                  },
+                  child: Text('Save Changes'),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
   }
 }
