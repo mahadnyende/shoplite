@@ -1,0 +1,36 @@
+name: shoplite
+
+environment:
+  sdk: '^3.8.0'
+
+dependencies:
+  flutter:
+    sdk: flutter
+  intl: any
+  sqflite_common_ffi: any
+  path: any
+  pdf: ^3.10.4
+  printing: ^5.11.0
+  shared_preferences: ^2.2.2
+  fl_chart: ^0.66.2
+  csv: ^5.1.1
+  file_picker: ^6.1.1
+  lucide_icons: ^0.255.0
+  material_design_icons_flutter: ^7.0.7296
+  syncfusion_flutter_datepicker: ^30.1.38
+
+# ...rest of your pubspec.yaml
+
+dev_dependencies:
+  flutter_launcher_icons: ^0.13.1
+
+flutter_launcher_icons:
+  android: true
+  ios: true
+  image_path: "icon.png"
+
+flutter:
+  uses-material-design: true
+  assets:
+    - assets/fonts/NotoSans-Regular.ttf
+    - assets/fonts/NotoSans-Bold.ttf
