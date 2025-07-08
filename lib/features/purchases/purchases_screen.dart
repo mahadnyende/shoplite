@@ -190,86 +190,94 @@ class _PurchasesScreenState extends State<PurchasesScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Card(
-              elevation: 2,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(16),
-              ),
-              child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 8.0, vertical: 4.0),
-                child: Row(
-                  children: [
-                    Expanded(
-                      child: TextField(
-                        decoration: InputDecoration(
-                          labelText: 'Search by supplier',
-                          prefixIcon: Icon(MdiIcons.magnify),
-                          border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(12),
+            SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              child: Card(
+                elevation: 2,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(16),
+                ),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 8.0, vertical: 4.0),
+                  child: Row(
+                    children: [
+                      SizedBox(
+                        width: 200,
+                        child: TextField(
+                          decoration: InputDecoration(
+                            labelText: 'Search by supplier',
+                            prefixIcon: Icon(MdiIcons.magnify),
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            contentPadding: EdgeInsets.symmetric(vertical: 0, horizontal: 12),
                           ),
-                          contentPadding: EdgeInsets.symmetric(vertical: 0, horizontal: 12),
+                          onChanged: (v) {
+                            setState(() {
+                              _supplierSearch = v;
+                            });
+                          },
                         ),
-                        onChanged: (v) {
-                          setState(() {
-                            _supplierSearch = v;
-                          });
-                        },
                       ),
-                    ),
-                    SizedBox(width: 8),
-                    SizedBox(
-                      width: 140,
-                      child: DropdownButtonFormField<String>(
-                        value: _deliveryFilter.isEmpty ? null : _deliveryFilter,
-                        decoration: InputDecoration(
-                          labelText: 'Delivery',
-                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                      SizedBox(width: 8),
+                      SizedBox(
+                        width: 150,
+                        child: DropdownButtonFormField<String>(
+                          value: _deliveryFilter.isEmpty ? null : _deliveryFilter,
+                          decoration: InputDecoration(
+                            labelText: 'Delivery',
+                            isDense: true,
+                            border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                          ),
+                          style: TextStyle(fontSize: 13),
+                          items: [
+                            DropdownMenuItem(value: '', child: Text('All', style: TextStyle(fontSize: 13))),
+                            DropdownMenuItem(value: 'Fully Received', child: Text('Fully Received', style: TextStyle(fontSize: 13))),
+                            DropdownMenuItem(value: 'Partially Received', child: Text('Partially Received', style: TextStyle(fontSize: 13))),
+                            DropdownMenuItem(value: 'Not Received', child: Text('Not Received', style: TextStyle(fontSize: 13))),
+                          ],
+                          onChanged: (v) {
+                            setState(() {
+                              _deliveryFilter = v ?? '';
+                            });
+                          },
                         ),
-                        items: [
-                          DropdownMenuItem(value: '', child: Text('All')),
-                          DropdownMenuItem(value: 'Fully Received', child: Text('Fully Received')),
-                          DropdownMenuItem(value: 'Partially Received', child: Text('Partially Received')),
-                          DropdownMenuItem(value: 'Not Received', child: Text('Not Received')),
-                        ],
-                        onChanged: (v) {
-                          setState(() {
-                            _deliveryFilter = v ?? '';
-                          });
-                        },
                       ),
-                    ),
-                    SizedBox(width: 8),
-                    SizedBox(
-                      width: 140,
-                      child: DropdownButtonFormField<String>(
-                        value: _paymentFilter.isEmpty ? null : _paymentFilter,
-                        decoration: InputDecoration(
-                          labelText: 'Payment',
-                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                      SizedBox(width: 8),
+                      SizedBox(
+                        width: 150,
+                        child: DropdownButtonFormField<String>(
+                          value: _paymentFilter.isEmpty ? null : _paymentFilter,
+                          decoration: InputDecoration(
+                            labelText: 'Payment',
+                            isDense: true,
+                            border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                          ),
+                          style: TextStyle(fontSize: 13),
+                          items: [
+                            DropdownMenuItem(value: '', child: Text('All', style: TextStyle(fontSize: 13))),
+                            DropdownMenuItem(value: 'Fully Paid', child: Text('Fully Paid', style: TextStyle(fontSize: 13))),
+                            DropdownMenuItem(value: 'Partially Paid', child: Text('Partially Paid', style: TextStyle(fontSize: 13))),
+                            DropdownMenuItem(value: 'Not Paid', child: Text('Not Paid', style: TextStyle(fontSize: 13))),
+                          ],
+                          onChanged: (v) {
+                            setState(() {
+                              _paymentFilter = v ?? '';
+                            });
+                          },
                         ),
-                        items: [
-                          DropdownMenuItem(value: '', child: Text('All')),
-                          DropdownMenuItem(value: 'Fully Paid', child: Text('Fully Paid')),
-                          DropdownMenuItem(value: 'Partially Paid', child: Text('Partially Paid')),
-                          DropdownMenuItem(value: 'Not Paid', child: Text('Not Paid')),
-                        ],
-                        onChanged: (v) {
-                          setState(() {
-                            _paymentFilter = v ?? '';
-                          });
-                        },
                       ),
-                    ),
-                    SizedBox(width: 8),
-                    Tooltip(
-                      message: 'Add New Purchase',
-                      child: ElevatedButton.icon(
-                        icon: Icon(MdiIcons.plus),
-                        label: Text('Add New'),
-                        onPressed: _showNewPurchaseDialog,
+                      SizedBox(width: 8),
+                      Tooltip(
+                        message: 'Add New Purchase',
+                        child: ElevatedButton.icon(
+                          icon: Icon(MdiIcons.plus),
+                          label: Text('Add New'),
+                          onPressed: _showNewPurchaseDialog,
+                        ),
                       ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
               ),
             ),
@@ -279,14 +287,14 @@ class _PurchasesScreenState extends State<PurchasesScreen> {
                 builder: (context, constraints) {
                   final tableWidth = constraints.maxWidth;
                   final colNo = tableWidth * 0.07;
-                  final colSupplier = tableWidth * 0.18;
-                  final colDate = tableWidth * 0.13;
-                  final colDelivery = tableWidth * 0.13;
-                  final colPayment = tableWidth * 0.13;
-                  final colTotal = tableWidth * 0.10;
-                  final colPaid = tableWidth * 0.10;
+                  final colSupplier = tableWidth * 0.13; // reduced from 0.18
+                  final colDate = tableWidth * 0.09;     // reduced from 0.13
+                  final colDelivery = tableWidth * 0.10; // reduced from 0.15
+                  final colPayment = tableWidth * 0.09;  // reduced from 0.13
+                  final colTotal = tableWidth * 0.14;
+                  final colPaid = tableWidth * 0.14;
                   final colBalance = tableWidth * 0.10;
-                  final colActions = tableWidth * 0.16;
+                  final colActions = tableWidth * 0.11;
                   return Container(
                     decoration: BoxDecoration(
                       border: Border.all(color: Colors.grey.shade300),
@@ -325,11 +333,26 @@ class _PurchasesScreenState extends State<PurchasesScreen> {
                                   child: Row(
                                     children: [
                                       _dataCell((idx + 1).toString(), colNo),
-                                      _dataCell(purchase['supplier'] ?? '', colSupplier),
-                                      _dataCell(purchase['date'] ?? '', colDate),
+                                      _dataCell(
+                                        Text(
+                                          purchase['supplier'] ?? '',
+                                          style: TextStyle(fontSize: 13),
+                                        ),
+                                        colSupplier,
+                                      ),
+                                      _dataCell(
+                                        Text(
+                                          purchase['date'] ?? '',
+                                          style: TextStyle(fontSize: 13),
+                                        ),
+                                        colDate,
+                                      ),
                                       _dataCell(
                                         Chip(
-                                          label: Text(purchase['delivery_status'] ?? ''),
+                                          label: Text(
+                                            purchase['delivery_status'] ?? '',
+                                            style: TextStyle(fontSize: 12),
+                                          ),
                                           backgroundColor: purchase['delivery_status'] == 'Fully Received'
                                               ? Colors.green.shade100
                                               : purchase['delivery_status'] == 'Partially Received'
@@ -342,13 +365,17 @@ class _PurchasesScreenState extends State<PurchasesScreen> {
                                                     ? Colors.orange.shade900
                                                     : Colors.red.shade900,
                                             fontWeight: FontWeight.bold,
+                                            fontSize: 12,
                                           ),
                                         ),
                                         colDelivery,
                                       ),
                                       _dataCell(
                                         Chip(
-                                          label: Text(purchase['payment_status'] ?? ''),
+                                          label: Text(
+                                            purchase['payment_status'] ?? '',
+                                            style: TextStyle(fontSize: 12),
+                                          ),
                                           backgroundColor: purchase['payment_status'] == 'Fully Paid'
                                               ? Colors.green.shade100
                                               : purchase['payment_status'] == 'Partially Paid'
@@ -361,6 +388,7 @@ class _PurchasesScreenState extends State<PurchasesScreen> {
                                                     ? Colors.orange.shade900
                                                     : Colors.red.shade900,
                                             fontWeight: FontWeight.bold,
+                                            fontSize: 12,
                                           ),
                                         ),
                                         colPayment,
