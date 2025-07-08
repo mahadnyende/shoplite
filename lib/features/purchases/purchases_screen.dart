@@ -106,6 +106,9 @@ class _PurchasesScreenState extends State<PurchasesScreen> {
     );
   }
 
+  // --- HOVER ROW HIGHLIGHT STATE ---
+  int? hoveredRowIndex;
+
   // Helper for fixed table body cell
   Widget _bodyCell(dynamic child, {int flex = 1, int col = 0, bool isAlt = false}) {
     final colWidths = [

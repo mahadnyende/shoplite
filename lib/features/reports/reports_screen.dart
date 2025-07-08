@@ -20,6 +20,8 @@ class ReportsScreen extends StatefulWidget {
 
 class _ReportsScreenState extends State<ReportsScreen>
     with SingleTickerProviderStateMixin {
+  int? hoveredRowIndexSales;
+  int? hoveredRowIndexPurchases;
   late TabController _tabController;
   final ScrollController _purchasesScrollController = ScrollController();
   final ScrollController _incomeStatementScrollController = ScrollController();
@@ -495,47 +497,66 @@ class _ReportsScreenState extends State<ReportsScreen>
         return salesSortAscending ? cmp : -cmp;
       });
     }
+    final totalSales = filtered.fold<int>(0, (sum, s) => sum + ((s['amount'] ?? 0) as num).toInt());
     final content = [
       Row(
         children: [
-          ElevatedButton.icon(
-            icon: Icon(MdiIcons.download),
-            label: Text('Export CSV'),
-            onPressed: () {
-              final rows = [
-                ['Invoice No.', 'Date', 'Amount', 'Payment Status'],
-                ...filtered.map(
-                  (sale) => [
-                    sale['id'],
-                    sale['date'],
-                    sale['amount'],
-                    sale['payment_status'],
-                  ],
-                ),
-              ];
-              _exportCSV(rows, 'sales_report.csv');
-            },
+          Tooltip(
+            message: 'Export sales report as CSV',
+            child: ElevatedButton.icon(
+              icon: Icon(MdiIcons.download),
+              label: Text('Export CSV'),
+              onPressed: () {
+                final rows = [
+                  ['Invoice No.', 'Date', 'Amount', 'Payment Status'],
+                  ...filtered.map(
+                    (sale) => [
+                      sale['id'],
+                      sale['date'],
+                      sale['amount'],
+                      sale['payment_status'],
+                    ],
+                  ),
+                ];
+                _exportCSV(rows, 'sales_report.csv');
+              },
+            ),
           ),
           SizedBox(width: 8),
-          ElevatedButton.icon(
-            icon: Icon(MdiIcons.filePdfBox),
-            label: Text('Export PDF'),
-            onPressed: () async {
-              final pdf = await _generateSalesReportPdf(filtered);
-              await Printing.sharePdf(
-                bytes: await pdf.save(),
-                filename: 'sales_report.pdf',
-              );
-            },
+          Tooltip(
+            message: 'Export sales report as PDF',
+            child: ElevatedButton.icon(
+              icon: Icon(MdiIcons.filePdfBox),
+              label: Text('Export PDF'),
+              onPressed: () async {
+                final pdf = await _generateSalesReportPdf(filtered);
+                await Printing.sharePdf(
+                  bytes: await pdf.save(),
+                  filename: 'sales_report.pdf',
+                );
+              },
+            ),
           ),
           SizedBox(width: 8),
-          ElevatedButton.icon(
-            icon: Icon(MdiIcons.printer),
-            label: Text('Print'),
-            onPressed: () async {
-              final pdf = await _generateSalesReportPdf(filtered);
-              await Printing.layoutPdf(onLayout: (format) => pdf.save());
-            },
+          Tooltip(
+            message: 'Print sales report',
+            child: ElevatedButton.icon(
+              icon: Icon(MdiIcons.printer),
+              label: Text('Print'),
+              onPressed: () async {
+                final pdf = await _generateSalesReportPdf(filtered);
+                await Printing.layoutPdf(onLayout: (format) => pdf.save());
+              },
+            ),
+          ),
+          SizedBox(width: 16),
+          Tooltip(
+            message: 'Total sales in this report',
+            child: Chip(
+              label: Text('UGX ${NumberFormat.decimalPattern().format(totalSales)}', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+              backgroundColor: Colors.green,
+              avatar: Icon(MdiIcons.cashPlus, color: Colors.white),
+            ),
           ),
         ],
       ),
@@ -599,59 +620,66 @@ class _ReportsScreenState extends State<ReportsScreen>
                       final paymentStatus = sale['payment_status'] ?? '';
                       final isPaid = paymentStatus.toString().toLowerCase().contains('paid') &&
                           !paymentStatus.toString().toLowerCase().contains('not');
-                      return Container(
-                        color: i % 2 == 0
-                            ? Theme.of(context).colorScheme.surfaceVariant.withOpacity(0.5)
-                            : Colors.transparent,
-                        child: Row(
-                          children: [
-                            Expanded(
-                              flex: 2,
-                              child: Padding(
-                                padding: const EdgeInsets.symmetric(vertical: 8.0, horizontal: 4),
-                                child: Text(sale['id'].toString()),
-                              ),
-                            ),
-                            Expanded(
-                              flex: 2,
-                              child: Padding(
-                                padding: const EdgeInsets.symmetric(vertical: 8.0, horizontal: 4),
-                                child: Text(sale['date'] ?? ''),
-                              ),
-                            ),
-                            Expanded(
-                              flex: 2,
-                              child: Padding(
-                                padding: const EdgeInsets.symmetric(vertical: 8.0, horizontal: 4),
-                                child: Text(
-                                  'UGX ${formatter.format(sale['amount'] ?? 0)}',
-                                  style: TextStyle(fontWeight: FontWeight.w500),
+                      final highlight = hoveredRowIndexSales == i;
+                      return MouseRegion(
+                        onEnter: (_) => setState(() { hoveredRowIndexSales = i; }),
+                        onExit: (_) => setState(() { hoveredRowIndexSales = null; }),
+                        child: Container(
+                          color: highlight
+                              ? Colors.blue.withOpacity(0.08)
+                              : (i % 2 == 0
+                                  ? Theme.of(context).colorScheme.surfaceVariant.withOpacity(0.5)
+                                  : Colors.transparent),
+                          child: Row(
+                            children: [
+                              Expanded(
+                                flex: 2,
+                                child: Padding(
+                                  padding: const EdgeInsets.symmetric(vertical: 8.0, horizontal: 4),
+                                  child: Text(sale['id'].toString()),
                                 ),
                               ),
-                            ),
-                            Expanded(
-                              flex: 2,
-                              child: Padding(
-                                padding: const EdgeInsets.symmetric(vertical: 8.0, horizontal: 4),
-                                child: Container(
-                                  padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                                  decoration: BoxDecoration(
-                                    color: isPaid
-                                        ? Colors.green.withOpacity(0.15)
-                                        : Colors.orange.withOpacity(0.15),
-                                    borderRadius: BorderRadius.circular(12),
-                                  ),
+                              Expanded(
+                                flex: 2,
+                                child: Padding(
+                                  padding: const EdgeInsets.symmetric(vertical: 8.0, horizontal: 4),
+                                  child: Text(sale['date'] ?? ''),
+                                ),
+                              ),
+                              Expanded(
+                                flex: 2,
+                                child: Padding(
+                                  padding: const EdgeInsets.symmetric(vertical: 8.0, horizontal: 4),
                                   child: Text(
-                                    paymentStatus,
-                                    style: TextStyle(
-                                      color: isPaid ? Colors.green : Colors.orange,
-                                      fontWeight: FontWeight.bold,
+                                    'UGX ${formatter.format(sale['amount'] ?? 0)}',
+                                    style: TextStyle(fontWeight: FontWeight.w500),
+                                  ),
+                                ),
+                              ),
+                              Expanded(
+                                flex: 2,
+                                child: Padding(
+                                  padding: const EdgeInsets.symmetric(vertical: 8.0, horizontal: 4),
+                                  child: Container(
+                                    padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                    decoration: BoxDecoration(
+                                      color: isPaid
+                                          ? Colors.green.withOpacity(0.15)
+                                          : Colors.orange.withOpacity(0.15),
+                                      borderRadius: BorderRadius.circular(12),
+                                    ),
+                                    child: Text(
+                                      paymentStatus,
+                                      style: TextStyle(
+                                        color: isPaid ? Colors.green : Colors.orange,
+                                        fontWeight: FontWeight.bold,
+                                      ),
                                     ),
                                   ),
                                 ),
                               ),
-                            ),
-                          ],
+                            ],
+                          ),
                         ),
                       );
                     },
@@ -764,7 +792,69 @@ class _ReportsScreenState extends State<ReportsScreen>
         return purchasesSortAscending ? cmp : -cmp;
       });
     }
+    final totalPurchases = filtered.fold<int>(0, (sum, p) => sum + ((p['total'] ?? 0) as num).toInt());
     final content = [
+      Row(
+        children: [
+          Tooltip(
+            message: 'Export purchases report as CSV',
+            child: ElevatedButton.icon(
+              icon: Icon(MdiIcons.download),
+              label: Text('Export CSV'),
+              onPressed: () {
+                final rows = [
+                  ['Supplier', 'Date', 'Payment Status', 'Delivery Status'],
+                  ...filtered.map(
+                    (p) => [
+                      p['supplier'],
+                      p['date'],
+                      p['payment_status'],
+                      p['delivery_status'],
+                    ],
+                  ),
+                ];
+                _exportCSV(rows, 'purchase_report.csv');
+              },
+            ),
+          ),
+          SizedBox(width: 8),
+          Tooltip(
+            message: 'Export purchases report as PDF',
+            child: ElevatedButton.icon(
+              icon: Icon(MdiIcons.filePdfBox),
+              label: Text('Export PDF'),
+              onPressed: () async {
+                final pdf = await _generatePurchaseReportPdf(filtered);
+                await Printing.sharePdf(
+                  bytes: await pdf.save(),
+                  filename: 'purchase_report.pdf',
+                );
+              },
+            ),
+          ),
+          SizedBox(width: 8),
+          Tooltip(
+            message: 'Print purchases report',
+            child: ElevatedButton.icon(
+              icon: Icon(MdiIcons.printer),
+              label: Text('Print'),
+              onPressed: () async {
+                final pdf = await _generatePurchaseReportPdf(filtered);
+                await Printing.layoutPdf(onLayout: (format) => pdf.save());
+              },
+            ),
+          ),
+          SizedBox(width: 16),
+          Tooltip(
+            message: 'Total purchases in this report',
+            child: Chip(
+              label: Text('UGX ${NumberFormat.decimalPattern().format(totalPurchases)}', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+              backgroundColor: Colors.blue,
+              avatar: Icon(MdiIcons.cartArrowDown, color: Colors.white),
+            ),
+          ),
+        ],
+      ),
       Card(
         elevation: 2,
         shape: RoundedRectangleBorder(
@@ -776,49 +866,6 @@ class _ReportsScreenState extends State<ReportsScreen>
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               SizedBox(height: 0),
-              Row(
-                children: [
-                  ElevatedButton.icon(
-                    icon: Icon(MdiIcons.download),
-                    label: Text('Export CSV'),
-                    onPressed: () {
-                      final rows = [
-                        ['Supplier', 'Date', 'Payment Status', 'Delivery Status'],
-                        ...filtered.map(
-                          (p) => [
-                            p['supplier'],
-                            p['date'],
-                            p['payment_status'],
-                            p['delivery_status'],
-                          ],
-                        ),
-                      ];
-                      _exportCSV(rows, 'purchase_report.csv');
-                    },
-                  ),
-                  SizedBox(width: 8),
-                  ElevatedButton.icon(
-                    icon: Icon(MdiIcons.filePdfBox),
-                    label: Text('Export PDF'),
-                    onPressed: () async {
-                      final pdf = await _generatePurchaseReportPdf(filtered);
-                      await Printing.sharePdf(
-                        bytes: await pdf.save(),
-                        filename: 'purchase_report.pdf',
-                      );
-                    },
-                  ),
-                  SizedBox(width: 8),
-                  ElevatedButton.icon(
-                    icon: Icon(MdiIcons.printer),
-                    label: Text('Print'),
-                    onPressed: () async {
-                      final pdf = await _generatePurchaseReportPdf(filtered);
-                      await Printing.layoutPdf(onLayout: (format) => pdf.save());
-                    },
-                  ),
-                ],
-              ),
               SizedBox(height: 16),
               Container(
                 decoration: BoxDecoration(
@@ -871,41 +918,48 @@ class _ReportsScreenState extends State<ReportsScreen>
                           padding: EdgeInsets.only(bottom: 24.0),
                           itemBuilder: (context, i) {
                             final p = filtered[i];
-                            return Container(
-                              color: i % 2 == 0
-                                  ? Theme.of(context).colorScheme.surfaceVariant.withOpacity(0.5)
-                                  : Colors.transparent,
-                              child: Row(
-                                children: [
-                                  Expanded(
-                                    flex: 2,
-                                    child: Padding(
-                                      padding: const EdgeInsets.symmetric(vertical: 8.0, horizontal: 4),
-                                      child: Text(p['supplier'] ?? ''),
+                            final highlight = hoveredRowIndexPurchases == i;
+                            return MouseRegion(
+                              onEnter: (_) => setState(() { hoveredRowIndexPurchases = i; }),
+                              onExit: (_) => setState(() { hoveredRowIndexPurchases = null; }),
+                              child: Container(
+                                color: highlight
+                                    ? Colors.blue.withOpacity(0.08)
+                                    : (i % 2 == 0
+                                        ? Theme.of(context).colorScheme.surfaceVariant.withOpacity(0.5)
+                                        : Colors.transparent),
+                                child: Row(
+                                  children: [
+                                    Expanded(
+                                      flex: 2,
+                                      child: Padding(
+                                        padding: const EdgeInsets.symmetric(vertical: 8.0, horizontal: 4),
+                                        child: Text(p['supplier'] ?? ''),
+                                      ),
                                     ),
-                                  ),
-                                  Expanded(
-                                    flex: 2,
-                                    child: Padding(
-                                      padding: const EdgeInsets.symmetric(vertical: 8.0, horizontal: 4),
-                                      child: Text(p['date'] ?? ''),
+                                    Expanded(
+                                      flex: 2,
+                                      child: Padding(
+                                        padding: const EdgeInsets.symmetric(vertical: 8.0, horizontal: 4),
+                                        child: Text(p['date'] ?? ''),
+                                      ),
                                     ),
-                                  ),
-                                  Expanded(
-                                    flex: 2,
-                                    child: Padding(
-                                      padding: const EdgeInsets.symmetric(vertical: 8.0, horizontal: 4),
-                                      child: Text(p['payment_status'] ?? ''),
+                                    Expanded(
+                                      flex: 2,
+                                      child: Padding(
+                                        padding: const EdgeInsets.symmetric(vertical: 8.0, horizontal: 4),
+                                        child: Text(p['payment_status'] ?? ''),
+                                      ),
                                     ),
-                                  ),
-                                  Expanded(
-                                    flex: 2,
-                                    child: Padding(
-                                      padding: const EdgeInsets.symmetric(vertical: 8.0, horizontal: 4),
-                                      child: Text(p['delivery_status'] ?? ''),
+                                    Expanded(
+                                      flex: 2,
+                                      child: Padding(
+                                        padding: const EdgeInsets.symmetric(vertical: 8.0, horizontal: 4),
+                                        child: Text(p['delivery_status'] ?? ''),
+                                      ),
                                     ),
-                                  ),
-                                ],
+                                  ],
+                                ),
                               ),
                             );
                           },
@@ -1057,7 +1111,75 @@ class _ReportsScreenState extends State<ReportsScreen>
     final profit = totalSales - totalExpenses;
     final formatter = NumberFormat.decimalPattern();
     final theme = Theme.of(context);
+    int? hoveredRowIndex;
     final content = [
+      Row(
+        children: [
+          Tooltip(
+            message: 'Export income statement as PDF',
+            child: ElevatedButton.icon(
+              icon: Icon(MdiIcons.filePdfBox),
+              label: Text('Export PDF'),
+              onPressed: () async {
+                final pdf = await _generateIncomeStatementPdf(
+                  totalSales,
+                  totalExpenses,
+                  profit,
+                );
+                await Printing.sharePdf(
+                  bytes: await pdf.save(),
+                  filename: 'income_statement.pdf',
+                );
+              },
+            ),
+          ),
+          SizedBox(width: 8),
+          Tooltip(
+            message: 'Print income statement',
+            child: ElevatedButton.icon(
+              icon: Icon(MdiIcons.printer),
+              label: Text('Print'),
+              onPressed: () async {
+                final pdf = await _generateIncomeStatementPdf(
+                  totalSales,
+                  totalExpenses,
+                  profit,
+                );
+                await Printing.layoutPdf(
+                  onLayout: (format) => pdf.save(),
+                );
+              },
+            ),
+          ),
+          SizedBox(width: 16),
+          Tooltip(
+            message: 'Total sales (revenue) in this period',
+            child: Chip(
+              label: Text('UGX ${formatter.format(totalSales)}', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+              backgroundColor: Colors.green,
+              avatar: Icon(MdiIcons.cashPlus, color: Colors.white),
+            ),
+          ),
+          SizedBox(width: 8),
+          Tooltip(
+            message: 'Total expenses in this period',
+            child: Chip(
+              label: Text('UGX ${formatter.format(totalExpenses)}', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+              backgroundColor: Colors.redAccent,
+              avatar: Icon(MdiIcons.cashMinus, color: Colors.white),
+            ),
+          ),
+          SizedBox(width: 8),
+          Tooltip(
+            message: 'Net profit (revenue - expenses)',
+            child: Chip(
+              label: Text('UGX ${formatter.format(profit)}', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+              backgroundColor: profit >= 0 ? Colors.green : Colors.red,
+              avatar: Icon(profit >= 0 ? MdiIcons.cashCheck : MdiIcons.cashRemove, color: Colors.white),
+            ),
+          ),
+        ],
+      ),
       Card(
         elevation: 2,
         shape: RoundedRectangleBorder(
@@ -1081,40 +1203,6 @@ class _ReportsScreenState extends State<ReportsScreen>
                 ],
               ),
               SizedBox(height: 16),
-              Row(
-                children: [
-                  ElevatedButton.icon(
-                    icon: Icon(MdiIcons.filePdfBox),
-                    label: Text('Export PDF'),
-                    onPressed: () async {
-                      final pdf = await _generateIncomeStatementPdf(
-                        totalSales,
-                        totalExpenses,
-                        profit,
-                      );
-                      await Printing.sharePdf(
-                        bytes: await pdf.save(),
-                        filename: 'income_statement.pdf',
-                      );
-                    },
-                  ),
-                  SizedBox(width: 8),
-                  ElevatedButton.icon(
-                    icon: Icon(MdiIcons.printer),
-                    label: Text('Print'),
-                    onPressed: () async {
-                      final pdf = await _generateIncomeStatementPdf(
-                        totalSales,
-                        totalExpenses,
-                        profit,
-                      );
-                      await Printing.layoutPdf(
-                        onLayout: (format) => pdf.save(),
-                      );
-                    },
-                  ),
-                ],
-              ),
               SizedBox(height: 16),
               Container(
                 decoration: BoxDecoration(

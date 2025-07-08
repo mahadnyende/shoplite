@@ -27,6 +27,9 @@ class _SalesScreenState extends State<SalesScreen> {
   String searchPayment = '';
   bool loading = true;
 
+  // --- HOVER ROW HIGHLIGHT STATE ---
+  int? hoveredRowIndex;
+
   // Sorting state
   String? sortColumn;
   bool sortAscending = true;
@@ -191,21 +194,24 @@ class _SalesScreenState extends State<SalesScreen> {
               Text('Sales', style: Theme.of(context).textTheme.headlineSmall),
               Row(
                 children: [
-                  Chip(
-                    avatar: Icon(
-                      MdiIcons.cashPlus,
-                      color: Colors.white,
-                    ),
-                    label: Text(
-                      'UGX ' + NumberFormat.decimalPattern().format(
-                        sales.fold<int>(0, (sum, s) => sum + (((s['amount'] ?? 0) is int ? s['amount'] ?? 0 : int.tryParse(s['amount'].toString()) ?? 0) as int)),
-                      ),
-                      style: TextStyle(
+                  Tooltip(
+                    message: 'Total sales amount for the selected period',
+                    child: Chip(
+                      avatar: Icon(
+                        MdiIcons.cashPlus,
                         color: Colors.white,
-                        fontWeight: FontWeight.bold,
                       ),
+                      label: Text(
+                        'UGX ' + NumberFormat.decimalPattern().format(
+                          sales.fold<int>(0, (sum, s) => sum + (((s['amount'] ?? 0) is int ? s['amount'] ?? 0 : int.tryParse(s['amount'].toString()) ?? 0) as int)),
+                        ),
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      backgroundColor: Colors.green,
                     ),
-                    backgroundColor: Colors.green,
                   ),
                   SizedBox(width: 8),
                   ElevatedButton.icon(
@@ -393,18 +399,23 @@ class _SalesScreenState extends State<SalesScreen> {
                                         final paid = sale['paid'] ?? 0;
                                         final amount = sale['amount'] ?? 0;
                                         final balance = amount - paid;
+                                        final highlight = hoveredRowIndex == i;
                                         return MouseRegion(
+                                          onEnter: (_) => setState(() => hoveredRowIndex = i),
+                                          onExit: (_) => setState(() => hoveredRowIndex = null),
                                           cursor: SystemMouseCursors.click,
                                           child: GestureDetector(
                                             onTap: () => _showSaleDetailsDialog(sale['id']),
                                             child: AnimatedContainer(
                                               duration: Duration(milliseconds: 150),
-                                              color: i % 2 == 0
-                                                  ? Theme.of(context)
-                                                      .colorScheme
-                                                      .surfaceVariant
-                                                      .withOpacity(0.5)
-                                                  : Colors.transparent,
+                                              color: highlight
+                                                  ? Colors.blue.withOpacity(0.08)
+                                                  : (i % 2 == 0
+                                                      ? Theme.of(context)
+                                                          .colorScheme
+                                                          .surfaceVariant
+                                                          .withOpacity(0.5)
+                                                      : Colors.transparent),
                                               child: IntrinsicWidth(
                                                 child: Row(
                                                   children: [

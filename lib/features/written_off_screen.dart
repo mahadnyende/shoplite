@@ -24,6 +24,7 @@ class _WrittenOffScreenState extends State<WrittenOffScreen> {
 
   String? _sortColumn;
   bool _sortAsc = true;
+  int? hoveredRowIndex;
 
   @override
   void initState() {
@@ -427,6 +428,9 @@ class _WrittenOffScreenState extends State<WrittenOffScreen> {
 
     final int grandTotal = filtered.fold(0, (sum, item) => sum + _rowTotal(item));
     final formatter = NumberFormat('#,##0', 'en_US');
+    // --- HOVER ROW HIGHLIGHT STATE ---
+    // int? hoveredRowIndex; // Now a class field
+
     return Scaffold(
       drawer: AppDrawer(
         isAdmin: true,
@@ -488,9 +492,12 @@ class _WrittenOffScreenState extends State<WrittenOffScreen> {
                             ),
                           ),
                           SizedBox(width: 8),
-                          Text(
-                            'Total: UGX ${formatter.format(grandTotal)}',
-                            style: TextStyle(fontWeight: FontWeight.bold, color: Colors.green, fontSize: 16),
+                          Tooltip(
+                            message: 'Total value of written off items',
+                            child: Text(
+                              'Total: UGX ${formatter.format(grandTotal)}',
+                              style: TextStyle(fontWeight: FontWeight.bold, color: Colors.green, fontSize: 16),
+                            ),
                           ),
                         ],
                       ),
@@ -630,99 +637,107 @@ class _WrittenOffScreenState extends State<WrittenOffScreen> {
                                     final item = filtered[i];
                                     final isExpired = (item['reason'] ?? '').toString().toLowerCase().contains('expired');
                                     final rowColor = i % 2 == 0 ? Colors.grey[50] : Colors.white;
-                                    return Container(
-                                      color: rowColor,
-                                      child: Row(
-                                        children: [
-                                          _dataCell((i + 1).toString(), colNo, fontWeight: FontWeight.bold),
-                                          _dataCell(item['name'] ?? '', colName, icon: MdiIcons.cubeOutline),
-                                          _dataCell(item['qty'].toString(), colQty),
-                                          _dataCell('UGX ${formatter.format(_rowTotal(item))}', colValue),
-                                          _dataCell(item['reason'] ?? '', colReason, icon: isExpired ? MdiIcons.clockAlertOutline : MdiIcons.alert, iconColor: isExpired ? Colors.red : Colors.orange),
-                                          _dataCell(item['expiry_date'] ?? '-', colExpiry),
-                                          _dataCell(item['written_off_at']?.toString().substring(0, 19) ?? '', colWrittenOff),
-                                          SizedBox(
-                                            width: 40,
-                                            child: IconButton(
-                                              icon: Icon(MdiIcons.undo, color: Colors.blueGrey, size: 20),
-                                              tooltip: 'Revert to Inventory',
-                                              onPressed: () async {
-                                                if ((item['reason'] ?? '').toString().toLowerCase().contains('expired')) {
-                                                  showDialog(
-                                                    context: context,
-                                                    builder: (context) => AlertDialog(
-                                                      title: Text('Cannot Revert'),
-                                                      content: Text('Expired items cannot be returned to inventory.'),
-                                                      actions: [
-                                                        TextButton(
-                                                          onPressed: () => Navigator.of(context).pop(),
-                                                          child: Text('OK'),
+                                    final highlight = hoveredRowIndex == i;
+                                    return MouseRegion(
+                                      onEnter: (_) => setState(() => hoveredRowIndex = i),
+                                      onExit: (_) => setState(() => hoveredRowIndex = null),
+                                      child: Container(
+                                        color: highlight ? Colors.blue.withOpacity(0.08) : rowColor,
+                                        child: Row(
+                                          children: [
+                                            _dataCell((i + 1).toString(), colNo, fontWeight: FontWeight.bold),
+                                            _dataCell(item['name'] ?? '', colName, icon: MdiIcons.cubeOutline),
+                                            _dataCell(item['qty'].toString(), colQty),
+                                            _dataCell('UGX ${formatter.format(_rowTotal(item))}', colValue),
+                                            _dataCell(item['reason'] ?? '', colReason, icon: isExpired ? MdiIcons.clockAlertOutline : MdiIcons.alert, iconColor: isExpired ? Colors.red : Colors.orange),
+                                            _dataCell(item['expiry_date'] ?? '-', colExpiry),
+                                            _dataCell(item['written_off_at']?.toString().substring(0, 19) ?? '', colWrittenOff),
+                                            SizedBox(
+                                              width: 40,
+                                              child: Tooltip(
+                                                message: 'Revert this item to inventory',
+                                                child: IconButton(
+                                                  icon: Icon(MdiIcons.undo, color: Colors.blueGrey, size: 20),
+                                                  tooltip: 'Revert to Inventory',
+                                                  onPressed: () async {
+                                                    if ((item['reason'] ?? '').toString().toLowerCase().contains('expired')) {
+                                                      showDialog(
+                                                        context: context,
+                                                        builder: (context) => AlertDialog(
+                                                          title: Text('Cannot Revert'),
+                                                          content: Text('Expired items cannot be returned to inventory.'),
+                                                          actions: [
+                                                            TextButton(
+                                                              onPressed: () => Navigator.of(context).pop(),
+                                                              child: Text('OK'),
+                                                            ),
+                                                          ],
                                                         ),
-                                                      ],
-                                                    ),
-                                                  );
-                                                  return;
-                                                }
-                                                final int qty = (item['qty'] is int) ? item['qty'] as int : int.tryParse(item['qty'].toString()) ?? 0;
-                                                final int price = (item['purchase'] is int) ? item['purchase'] as int : int.tryParse(item['purchase']?.toString() ?? '') ?? 0;
-                                                final int total = qty * price;
-                                                final formatter = NumberFormat('#,##0', 'en_US');
-                                                final confirm = await showDialog<bool>(
-                                                  context: context,
-                                                  builder: (context) => AlertDialog(
-                                                    title: Text('Revert Write Off'),
-                                                    content: Column(
-                                                      mainAxisSize: MainAxisSize.min,
-                                                      crossAxisAlignment: CrossAxisAlignment.start,
-                                                      children: [
-                                                        Text('Are you sure you want to return this item to inventory?'),
-                                                        SizedBox(height: 12),
-                                                        Text('Item: ${item['name']}', style: TextStyle(fontWeight: FontWeight.bold)),
-                                                        Text('Quantity: $qty'),
-                                                        Text('Unit Price: UGX ${formatter.format(price)}'),
-                                                        Text('Total Value: UGX ${formatter.format(total)}', style: TextStyle(fontWeight: FontWeight.bold)),
-                                                      ],
-                                                    ),
-                                                    actions: [
-                                                      TextButton(
-                                                        onPressed: () => Navigator.of(context).pop(false),
-                                                        child: Text('Cancel'),
+                                                      );
+                                                      return;
+                                                    }
+                                                    final int qty = (item['qty'] is int) ? item['qty'] as int : int.tryParse(item['qty'].toString()) ?? 0;
+                                                    final int price = (item['purchase'] is int) ? item['purchase'] as int : int.tryParse(item['purchase']?.toString() ?? '') ?? 0;
+                                                    final int total = qty * price;
+                                                    final formatter = NumberFormat('#,##0', 'en_US');
+                                                    final confirm = await showDialog<bool>(
+                                                      context: context,
+                                                      builder: (context) => AlertDialog(
+                                                        title: Text('Revert Write Off'),
+                                                        content: Column(
+                                                          mainAxisSize: MainAxisSize.min,
+                                                          crossAxisAlignment: CrossAxisAlignment.start,
+                                                          children: [
+                                                            Text('Are you sure you want to return this item to inventory?'),
+                                                            SizedBox(height: 12),
+                                                            Text('Item: ${item['name']}', style: TextStyle(fontWeight: FontWeight.bold)),
+                                                            Text('Quantity: $qty'),
+                                                            Text('Unit Price: UGX ${formatter.format(price)}'),
+                                                            Text('Total Value: UGX ${formatter.format(total)}', style: TextStyle(fontWeight: FontWeight.bold)),
+                                                          ],
+                                                        ),
+                                                        actions: [
+                                                          TextButton(
+                                                            onPressed: () => Navigator.of(context).pop(false),
+                                                            child: Text('Cancel'),
+                                                          ),
+                                                          ElevatedButton(
+                                                            onPressed: () => Navigator.of(context).pop(true),
+                                                            child: Text('Revert'),
+                                                          ),
+                                                        ],
                                                       ),
-                                                      ElevatedButton(
-                                                        onPressed: () => Navigator.of(context).pop(true),
-                                                        child: Text('Revert'),
-                                                      ),
-                                                    ],
-                                                  ),
-                                                );
-                                                if (confirm == true) {
-                                                  final db = await AppDatabase.database;
-                                                  // Check if item exists in inventory
-                                                  final inv = await db.query('inventory', where: 'name = ? AND branch_id = ?', whereArgs: [item['name'], item['branch_id']]);
-                                                  if (inv.isNotEmpty) {
-                                                    final invItem = inv.first;
-                                                    final int currentQty = (invItem['qty'] is int) ? invItem['qty'] as int : int.tryParse(invItem['qty'].toString()) ?? 0;
-                                                    final int addQty = (item['qty'] is int) ? item['qty'] as int : int.tryParse(item['qty'].toString()) ?? 0;
-                                                    await db.update('inventory', {'qty': currentQty + addQty}, where: 'id = ?', whereArgs: [invItem['id']]);
-                                                  } else {
-                                                    // Recreate inventory item if missing
-                                                    await db.insert('inventory', {
-                                                      'name': item['name'],
-                                                      'qty': item['qty'],
-                                                      'purchase': item['purchase'],
-                                                      'sale': item['sale'],
-                                                      'expiry_date': item['expiry_date'],
-                                                      'branch_id': item['branch_id'],
-                                                    });
-                                                  }
-                                                  // Remove from written_off
-                                                  await db.delete('written_off', where: 'id = ?', whereArgs: [item['id']]);
-                                                  _loadWrittenOff();
-                                                }
-                                              },
+                                                    );
+                                                    if (confirm == true) {
+                                                      final db = await AppDatabase.database;
+                                                      // Check if item exists in inventory
+                                                      final inv = await db.query('inventory', where: 'name = ? AND branch_id = ?', whereArgs: [item['name'], item['branch_id']]);
+                                                      if (inv.isNotEmpty) {
+                                                        final invItem = inv.first;
+                                                        final int currentQty = (invItem['qty'] is int) ? invItem['qty'] as int : int.tryParse(invItem['qty'].toString()) ?? 0;
+                                                        final int addQty = (item['qty'] is int) ? item['qty'] as int : int.tryParse(item['qty'].toString()) ?? 0;
+                                                        await db.update('inventory', {'qty': currentQty + addQty}, where: 'id = ?', whereArgs: [invItem['id']]);
+                                                      } else {
+                                                        // Recreate inventory item if missing
+                                                        await db.insert('inventory', {
+                                                          'name': item['name'],
+                                                          'qty': item['qty'],
+                                                          'purchase': item['purchase'],
+                                                          'sale': item['sale'],
+                                                          'expiry_date': item['expiry_date'],
+                                                          'branch_id': item['branch_id'],
+                                                        });
+                                                      }
+                                                      // Remove from written_off
+                                                      await db.delete('written_off', where: 'id = ?', whereArgs: [item['id']]);
+                                                      _loadWrittenOff();
+                                                    }
+                                                  },
+                                                ),
+                                              ),
                                             ),
-                                          ),
-                                        ],
+                                          ],
+                                        ),
                                       ),
                                     );
                                   },

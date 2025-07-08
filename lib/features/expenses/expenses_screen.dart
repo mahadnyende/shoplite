@@ -20,6 +20,7 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
   final _amountController = TextEditingController();
   String? errorMsg;
   bool saveEnabled = false;
+  int? hoveredRowIndex;
 
   // Sorting state
   String? sortColumn;
@@ -257,6 +258,9 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
       ),
       Divider(height: 1, thickness: 1),
       // Data rows
+      // --- HOVER ROW HIGHLIGHT STATE ---
+      // Move this to the class field section:
+      // int? hoveredRowIndex;
       Expanded(
       child: ListView.builder(
       itemCount: expenses.length,
@@ -268,91 +272,99 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
       _amountController.text.trim() != (item['amount'] ?? '').toString()
       );
       final canSave = isEditing && _descController.text.trim().isNotEmpty && int.tryParse(_amountController.text.trim()) != null && isChanged;
-      return Row(
-      children: [
-      Flexible(flex: 8, child: _dataCell((i + 1).toString(), double.infinity)),
-      Flexible(
-      flex: 38,
-      child: _dataCell(
-      isEditing
-      ? TextField(
-      controller: _descController,
-      decoration: InputDecoration(
-      labelText: 'Description',
-      prefixIcon: Icon(MdiIcons.textBoxOutline),
-      border: OutlineInputBorder(),
-      ),
-      onChanged: (_) => setState(() {}),
-      )
-      : Text(item['description'] ?? ''),
-      double.infinity,
-      ),
-      ),
-      Flexible(
-      flex: 18,
-      child: _dataCell(
-      isEditing
-      ? TextField(
-      controller: _amountController,
-      keyboardType: TextInputType.number,
-      decoration: InputDecoration(
-      labelText: 'Amount',
-      prefixIcon: Icon(MdiIcons.currencyUsd),
-      border: OutlineInputBorder(),
-      ),
-      onChanged: (_) => setState(() {}),
-      )
-      : Text('UGX ${formatter.format(item['amount'] ?? 0)}'),
-      double.infinity,
-      ),
-      ),
-      Flexible(flex: 18, child: _dataCell(Text(item['date'] ?? ''), double.infinity)),
-      Flexible(
-      flex: 18,
-      child: _dataCell(
-      isEditing
-      ? Row(
-      children: [
-      IconButton(
-      icon: Icon(MdiIcons.contentSave, color: canSave ? Colors.green : Colors.grey),
-      onPressed: canSave ? () => _saveEdit(item['id']) : null,
-      tooltip: 'Save',
-      ),
-      IconButton(icon: Icon(MdiIcons.closeCircle, color: Colors.red), onPressed: () => setState(() => editingId = null), tooltip: 'Cancel'),
-      ],
-      )
-      : Row(
-      children: [
-      IconButton(icon: Icon(MdiIcons.pencil), onPressed: () => _startEdit(item), tooltip: 'Edit'),
-      IconButton(
-      icon: Icon(MdiIcons.delete, color: Colors.red),
-      tooltip: 'Delete',
-      onPressed: () async {
-      final confirm = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-      title: Text('Delete Expense'),
-      content: Text('Are you sure you want to delete this expense?'),
-      actions: [
-      TextButton(onPressed: () => Navigator.of(context).pop(false), child: Text('Cancel')),
-      ElevatedButton(onPressed: () => Navigator.of(context).pop(true), child: Text('Delete')),
-      ],
-      ),
-      );
-      if (confirm == true) {
-      final db = await AppDatabase.database;
-      await db.delete('expenses', where: 'id = ?', whereArgs: [item['id']]);
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Expense deleted.')));
-      await _loadExpenses();
-      }
-      },
-      ),
-      ],
-      ),
-      double.infinity,
-      ),
-      ),
-      ],
+      final highlight = hoveredRowIndex == i;
+      return MouseRegion(
+        onEnter: (_) => setState(() { hoveredRowIndex = i; }),
+        onExit: (_) => setState(() { hoveredRowIndex = null; }),
+        child: Container(
+          color: highlight ? Colors.blue.withOpacity(0.08) : null,
+          child: Row(
+            children: [
+              Flexible(flex: 8, child: _dataCell((i + 1).toString(), double.infinity)),
+              Flexible(
+                flex: 38,
+                child: _dataCell(
+                  isEditing
+                      ? TextField(
+                          controller: _descController,
+                          decoration: InputDecoration(
+                            labelText: 'Description',
+                            prefixIcon: Icon(MdiIcons.textBoxOutline),
+                            border: OutlineInputBorder(),
+                          ),
+                          onChanged: (_) => setState(() {}),
+                        )
+                      : Text(item['description'] ?? ''),
+                  double.infinity,
+                ),
+              ),
+              Flexible(
+                flex: 18,
+                child: _dataCell(
+                  isEditing
+                      ? TextField(
+                          controller: _amountController,
+                          keyboardType: TextInputType.number,
+                          decoration: InputDecoration(
+                            labelText: 'Amount',
+                            prefixIcon: Icon(MdiIcons.currencyUsd),
+                            border: OutlineInputBorder(),
+                          ),
+                          onChanged: (_) => setState(() {}),
+                        )
+                      : Text('UGX ${formatter.format(item['amount'] ?? 0)}'),
+                  double.infinity,
+                ),
+              ),
+              Flexible(flex: 18, child: _dataCell(Text(item['date'] ?? ''), double.infinity)),
+              Flexible(
+                flex: 18,
+                child: _dataCell(
+                  isEditing
+                      ? Row(
+                          children: [
+                            IconButton(
+                              icon: Icon(MdiIcons.contentSave, color: canSave ? Colors.green : Colors.grey),
+                              onPressed: canSave ? () => _saveEdit(item['id']) : null,
+                              tooltip: 'Save',
+                            ),
+                            IconButton(icon: Icon(MdiIcons.closeCircle, color: Colors.red), onPressed: () => setState(() => editingId = null), tooltip: 'Cancel'),
+                          ],
+                        )
+                      : Row(
+                          children: [
+                            IconButton(icon: Icon(MdiIcons.pencil), onPressed: () => _startEdit(item), tooltip: 'Edit'),
+                            IconButton(
+                              icon: Icon(MdiIcons.delete, color: Colors.red),
+                              tooltip: 'Delete',
+                              onPressed: () async {
+                                final confirm = await showDialog<bool>(
+                                  context: context,
+                                  builder: (context) => AlertDialog(
+                                    title: Text('Delete Expense'),
+                                    content: Text('Are you sure you want to delete this expense?'),
+                                    actions: [
+                                      TextButton(onPressed: () => Navigator.of(context).pop(false), child: Text('Cancel')),
+                                      ElevatedButton(onPressed: () => Navigator.of(context).pop(true), child: Text('Delete')),
+                                    ],
+                                  ),
+                                );
+                                if (confirm == true) {
+                                  final db = await AppDatabase.database;
+                                  await db.delete('expenses', where: 'id = ?', whereArgs: [item['id']]);
+                                  ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Expense deleted.')));
+                                  await _loadExpenses();
+                                }
+                              },
+                            ),
+                          ],
+                        ),
+                  double.infinity,
+                ),
+              ),
+            ],
+          ),
+        ),
       );
       },
       ),
