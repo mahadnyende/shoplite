@@ -430,6 +430,15 @@ class _PurchasesScreenState extends State<PurchasesScreen> {
     _loadBusinessDetails();
   }
 
+  @override
+  void didUpdateWidget(covariant PurchasesScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.branchId != widget.branchId) {
+      _loadPurchases();
+      _loadBusinessDetails();
+    }
+  }
+
   Future<void> _loadBusinessDetails() async {
     final prefs = await SharedPreferences.getInstance();
     setState(() {
@@ -542,20 +551,50 @@ class _PurchasesScreenState extends State<PurchasesScreen> {
     double colBalance,
     double colActions,
   ) {
+    // Column keys and display names
+    final columns = [
+      {'label': 'No.', 'width': colNo, 'index': 0},
+      {'label': 'Supplier', 'width': colSupplier, 'index': 1},
+      {'label': 'Date', 'width': colDate, 'index': 2},
+      {'label': 'Delivery', 'width': colDelivery, 'index': 3},
+      {'label': 'Payment', 'width': colPayment, 'index': 4},
+      {'label': 'Total', 'width': colTotal, 'index': 5},
+      {'label': 'Paid', 'width': colPaid, 'index': 6},
+      {'label': 'Balance', 'width': colBalance, 'index': 7},
+      {'label': 'Actions', 'width': colActions, 'index': null},
+    ];
     return Container(
       color: Theme.of(context).colorScheme.surface,
       child: Row(
-        children: [
-          _dataCell('No.', colNo),
-          _dataCell('Supplier', colSupplier),
-          _dataCell('Date', colDate),
-          _dataCell('Delivery', colDelivery),
-          _dataCell('Payment', colPayment),
-          _dataCell('Total', colTotal),
-          _dataCell('Paid', colPaid),
-          _dataCell('Balance', colBalance),
-          _dataCell('Actions', colActions),
-        ],
+        children: columns.map((col) {
+          if (col['index'] == null) {
+            return _dataCell(col['label'], col['width'] as double);
+          }
+          final idx = col['index'] as int;
+          final isSorted = _sortColumnIndex == idx;
+          final icon = isSorted
+              ? (_sortAscending
+                  ? Icons.arrow_drop_up
+                  : Icons.arrow_drop_down)
+              : null;
+          return GestureDetector(
+            onTap: () {
+              final ascending = _sortColumnIndex == idx ? !_sortAscending : true;
+              _sortPurchases(col['label'].toString(), ascending, idx);
+            },
+            child: Container(
+              width: col['width'] as double,
+              padding: EdgeInsets.symmetric(vertical: 8, horizontal: 4),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(col['label'].toString(), style: TextStyle(fontWeight: FontWeight.bold)),
+                  if (icon != null) Icon(icon, size: 18),
+                ],
+              ),
+            ),
+          );
+        }).toList(),
       ),
     );
   }
@@ -619,14 +658,36 @@ class _PurchasesScreenState extends State<PurchasesScreen> {
                           decoration: InputDecoration(
                             labelText: 'Delivery',
                             isDense: true,
+                            filled: true,
+                            fillColor: Theme.of(context).brightness == Brightness.light ? Colors.grey.shade100 : Colors.grey.shade800,
                             border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
                           ),
                           style: TextStyle(fontSize: 13),
                           items: [
-                            DropdownMenuItem(value: '', child: Text('All', style: TextStyle(fontSize: 13))),
-                            DropdownMenuItem(value: 'Fully Received', child: Text('Fully Received', style: TextStyle(fontSize: 13))),
-                            DropdownMenuItem(value: 'Partially Received', child: Text('Partially Received', style: TextStyle(fontSize: 13))),
-                            DropdownMenuItem(value: 'Not Received', child: Text('Not Received', style: TextStyle(fontSize: 13))),
+                            DropdownMenuItem(
+                              value: '',
+                              child: Builder(
+                                builder: (context) => Text('All', style: TextStyle(fontSize: 13, color: Theme.of(context).brightness == Brightness.light ? Colors.black : Colors.white)),
+                              ),
+                            ),
+                            DropdownMenuItem(
+                              value: 'Fully Received',
+                              child: Builder(
+                                builder: (context) => Text('Fully Received', style: TextStyle(fontSize: 13, color: Theme.of(context).brightness == Brightness.light ? Colors.black : Colors.white)),
+                              ),
+                            ),
+                            DropdownMenuItem(
+                              value: 'Partially Received',
+                              child: Builder(
+                                builder: (context) => Text('Partially Received', style: TextStyle(fontSize: 13, color: Theme.of(context).brightness == Brightness.light ? Colors.black : Colors.white)),
+                              ),
+                            ),
+                            DropdownMenuItem(
+                              value: 'Not Received',
+                              child: Builder(
+                                builder: (context) => Text('Not Received', style: TextStyle(fontSize: 13, color: Theme.of(context).brightness == Brightness.light ? Colors.black : Colors.white)),
+                              ),
+                            ),
                           ],
                           onChanged: (v) {
                             setState(() {
@@ -643,14 +704,36 @@ class _PurchasesScreenState extends State<PurchasesScreen> {
                           decoration: InputDecoration(
                             labelText: 'Payment',
                             isDense: true,
+                            filled: true,
+                            fillColor: Theme.of(context).brightness == Brightness.light ? Colors.grey.shade100 : Colors.grey.shade800,
                             border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
                           ),
                           style: TextStyle(fontSize: 13),
                           items: [
-                            DropdownMenuItem(value: '', child: Text('All', style: TextStyle(fontSize: 13))),
-                            DropdownMenuItem(value: 'Fully Paid', child: Text('Fully Paid', style: TextStyle(fontSize: 13))),
-                            DropdownMenuItem(value: 'Partially Paid', child: Text('Partially Paid', style: TextStyle(fontSize: 13))),
-                            DropdownMenuItem(value: 'Not Paid', child: Text('Not Paid', style: TextStyle(fontSize: 13))),
+                            DropdownMenuItem(
+                              value: '',
+                              child: Builder(
+                                builder: (context) => Text('All', style: TextStyle(fontSize: 13, color: Theme.of(context).brightness == Brightness.light ? Colors.black : Colors.white)),
+                              ),
+                            ),
+                            DropdownMenuItem(
+                              value: 'Fully Paid',
+                              child: Builder(
+                                builder: (context) => Text('Fully Paid', style: TextStyle(fontSize: 13, color: Theme.of(context).brightness == Brightness.light ? Colors.black : Colors.white)),
+                              ),
+                            ),
+                            DropdownMenuItem(
+                              value: 'Partially Paid',
+                              child: Builder(
+                                builder: (context) => Text('Partially Paid', style: TextStyle(fontSize: 13, color: Theme.of(context).brightness == Brightness.light ? Colors.black : Colors.white)),
+                              ),
+                            ),
+                            DropdownMenuItem(
+                              value: 'Unpaid',
+                              child: Builder(
+                                builder: (context) => Text('Unpaid', style: TextStyle(fontSize: 13, color: Theme.of(context).brightness == Brightness.light ? Colors.black : Colors.white)),
+                              ),
+                            ),
                           ],
                           onChanged: (v) {
                             setState(() {
@@ -666,6 +749,23 @@ class _PurchasesScreenState extends State<PurchasesScreen> {
                           icon: Icon(MdiIcons.plus),
                           label: Text('Add New'),
                           onPressed: _showNewPurchaseDialog,
+                        ),
+                      ),
+                      SizedBox(width: 8),
+                      Tooltip(
+                        message: 'Reset Filters',
+                        child: OutlinedButton.icon(
+                          icon: Icon(Icons.refresh),
+                          label: Text('Reset'),
+                          onPressed: () {
+                            setState(() {
+                              _supplierSearch = '';
+                              _deliveryFilter = '';
+                              _paymentFilter = '';
+                              fromDate = null;
+                              toDate = null;
+                            });
+                          },
                         ),
                       ),
                     ],

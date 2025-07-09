@@ -96,13 +96,13 @@ class _SalesScreenState extends State<SalesScreen> {
             if (onTap != null)
               Padding(
                 padding: const EdgeInsets.only(left: 2.0),
-                child: Icon(
-                  isSorted
-                      ? (sortAscending ? MdiIcons.sortAscending : MdiIcons.sortDescending)
-                      : MdiIcons.unfoldMoreHorizontal,
-                  size: 14,
-                  color: isSorted ? Colors.blue : Colors.grey,
-                ),
+                child: isSorted
+                    ? Icon(
+                        sortAscending ? Icons.arrow_drop_up : Icons.arrow_drop_down,
+                        size: 18,
+                        color: Colors.blueGrey,
+                      )
+                    : SizedBox(width: 18),
               ),
           ],
         ),
@@ -175,11 +175,85 @@ class _SalesScreenState extends State<SalesScreen> {
   // --- Stub implementations for missing methods ---
   Future<void> _exportSalesToPdf() async {}
   Future<void> _exportSalesToCsv() async {}
-  Future<void> _showNewSaleDialog() async {}
-  Future<void> _showSaleDetailsDialog(int saleId) async {}
-  Future<void> _showPaymentDialog(Map<String, dynamic> sale) async {}
-  Future<void> _returnGoods(Map<String, dynamic> sale) async {}
-  Future<void> _editInvoice(Map<String, dynamic> sale) async {}
+  Future<void> _showNewSaleDialog() async {
+    await showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text('New Sale'),
+        content: Text('This is a placeholder for creating a new sale.'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: Text('Close'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _showSaleDetailsDialog(int saleId) async {
+    await showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text('Sale Details'),
+        content: Text('Details for sale ID: ' + saleId.toString()),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: Text('Close'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _showPaymentDialog(Map<String, dynamic> sale) async {
+    await showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text('Make Payment'),
+        content: Text('Make payment for sale ID: ' + (sale['id']?.toString() ?? '')), 
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: Text('Close'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _returnGoods(Map<String, dynamic> sale) async {
+    await showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text('Return Goods'),
+        content: Text('Return goods for sale ID: ' + (sale['id']?.toString() ?? '')),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: Text('Close'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _editInvoice(Map<String, dynamic> sale) async {
+    await showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text('Edit Invoice'),
+        content: Text('Edit invoice for sale ID: ' + (sale['id']?.toString() ?? '')),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: Text('Close'),
+          ),
+        ],
+      ),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {

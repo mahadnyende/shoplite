@@ -171,56 +171,55 @@ class _InventoryScreenState extends State<InventoryScreen> {
                               children: [
                                 Expanded(
                                   child: TextField(
-                                  controller: _nameController,
-                                  autofocus: true,
-                                  decoration: InputDecoration(
-                                  labelText: 'Search by name',
-                                  prefixIcon: Icon(MdiIcons.magnify),
-                                  suffixIcon: search.isNotEmpty
-                                  ? (loading
-                                  ? Padding(
-                                  padding: const EdgeInsets.all(12.0),
-                                  child: SizedBox(
-                                  width: 16,
-                                  height: 16,
-                                  child: CircularProgressIndicator(strokeWidth: 2),
-                                  ),
-                                  )
-                                  : IconButton(
-                                      icon: Icon(
-                                        MdiIcons.closeCircleOutline,
-                                        color: Colors.grey[500],
-                                        size: 22,
+                                    controller: _nameController,
+                                    decoration: InputDecoration(
+                                      labelText: 'Search by name',
+                                      prefixIcon: Icon(MdiIcons.magnify),
+                                      suffixIcon: search.isNotEmpty
+                                          ? (loading
+                                              ? Padding(
+                                                  padding: const EdgeInsets.all(12.0),
+                                                  child: SizedBox(
+                                                    width: 16,
+                                                    height: 16,
+                                                    child: CircularProgressIndicator(strokeWidth: 2),
+                                                  ),
+                                                )
+                                              : IconButton(
+                                                  icon: Icon(
+                                                    MdiIcons.closeCircleOutline,
+                                                    color: Colors.grey[500],
+                                                    size: 22,
+                                                  ),
+                                                  splashRadius: 20,
+                                                  tooltip: 'Clear',
+                                                  onPressed: () {
+                                                    setState(() {
+                                                      search = '';
+                                                      _nameController.clear();
+                                                    });
+                                                    _loadInventory();
+                                                  },
+                                                ))
+                                          : null,
+                                      border: OutlineInputBorder(
+                                        borderRadius: BorderRadius.circular(12),
                                       ),
-                                      splashRadius: 20,
-                                      tooltip: 'Clear',
-                                      onPressed: () {
-                                        setState(() {
-                                          search = '';
-                                          _nameController.clear();
-                                        });
-                                        _loadInventory();
-                                      },
-                                    ))
-                                  : null,
-                                  border: OutlineInputBorder(
-                                  borderRadius: BorderRadius.circular(12),
-                                  ),
-                                  contentPadding: EdgeInsets.symmetric(vertical: 0, horizontal: 12),
-                                  ),
-                                  onChanged: (v) {
-                                  if (_searchDebounce?.isActive ?? false)
-                                  _searchDebounce!.cancel();
-                                  _searchDebounce = Timer(
-                                  const Duration(milliseconds: 350),
-                                  () async {
-                                  setState(() {
-                                  search = v;
-                                  });
-                                  await _loadInventory();
-                                  },
-                                  );
-                                  },
+                                      contentPadding: EdgeInsets.symmetric(vertical: 0, horizontal: 12),
+                                    ),
+                                    onChanged: (v) {
+                                      if (_searchDebounce?.isActive ?? false)
+                                        _searchDebounce!.cancel();
+                                      _searchDebounce = Timer(
+                                        const Duration(milliseconds: 350),
+                                        () async {
+                                          setState(() {
+                                            search = v;
+                                          });
+                                          await _loadInventory();
+                                        },
+                                      );
+                                    },
                                   ),
                                 ),
                                 SizedBox(width: 8),
@@ -231,11 +230,18 @@ class _InventoryScreenState extends State<InventoryScreen> {
                                       labelText: 'Min Qty',
                                     ),
                                     keyboardType: TextInputType.number,
-                                    onChanged: (v) async {
-                                      setState(() {
-                                        filterMinQty = int.tryParse(v);
-                                      });
-                                      await _loadInventory();
+                                    controller: _minQtyController,
+                                    onChanged: (v) {
+                                      if (_minQtyDebounce?.isActive ?? false) _minQtyDebounce!.cancel();
+                                      _minQtyDebounce = Timer(
+                                        const Duration(milliseconds: 350),
+                                        () async {
+                                          setState(() {
+                                            filterMinQty = int.tryParse(v);
+                                          });
+                                          await _loadInventory();
+                                        },
+                                      );
                                     },
                                   ),
                                 ),
@@ -247,11 +253,18 @@ class _InventoryScreenState extends State<InventoryScreen> {
                                       labelText: 'Max Qty',
                                     ),
                                     keyboardType: TextInputType.number,
-                                    onChanged: (v) async {
-                                      setState(() {
-                                        filterMaxQty = int.tryParse(v);
-                                      });
-                                      await _loadInventory();
+                                    controller: _maxQtyController,
+                                    onChanged: (v) {
+                                      if (_maxQtyDebounce?.isActive ?? false) _maxQtyDebounce!.cancel();
+                                      _maxQtyDebounce = Timer(
+                                        const Duration(milliseconds: 350),
+                                        () async {
+                                          setState(() {
+                                            filterMaxQty = int.tryParse(v);
+                                          });
+                                          await _loadInventory();
+                                        },
+                                      );
                                     },
                                   ),
                                 ),
@@ -263,11 +276,18 @@ class _InventoryScreenState extends State<InventoryScreen> {
                                       labelText: 'Min Price',
                                     ),
                                     keyboardType: TextInputType.number,
-                                    onChanged: (v) async {
-                                      setState(() {
-                                        filterMinPrice = int.tryParse(v);
-                                      });
-                                      await _loadInventory();
+                                    controller: _minPriceController,
+                                    onChanged: (v) {
+                                      if (_minPriceDebounce?.isActive ?? false) _minPriceDebounce!.cancel();
+                                      _minPriceDebounce = Timer(
+                                        const Duration(milliseconds: 350),
+                                        () async {
+                                          setState(() {
+                                            filterMinPrice = int.tryParse(v);
+                                          });
+                                          await _loadInventory();
+                                        },
+                                      );
                                     },
                                   ),
                                 ),
@@ -279,13 +299,47 @@ class _InventoryScreenState extends State<InventoryScreen> {
                                       labelText: 'Max Price',
                                     ),
                                     keyboardType: TextInputType.number,
-                                    onChanged: (v) async {
-                                      setState(() {
-                                        filterMaxPrice = int.tryParse(v);
-                                      });
-                                      await _loadInventory();
+                                    controller: _maxPriceController,
+                                    onChanged: (v) {
+                                      if (_maxPriceDebounce?.isActive ?? false) _maxPriceDebounce!.cancel();
+                                      _maxPriceDebounce = Timer(
+                                        const Duration(milliseconds: 350),
+                                        () async {
+                                          setState(() {
+                                            filterMaxPrice = int.tryParse(v);
+                                          });
+                                          await _loadInventory();
+                                        },
+                                      );
                                     },
                                   ),
+                                ),
+                                SizedBox(width: 10),
+                                ElevatedButton.icon(
+                                  icon: Icon(Icons.clear),
+                                  label: Text('Clear Filters'),
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: Colors.grey[200],
+                                    foregroundColor: Colors.black87,
+                                    elevation: 0,
+                                    padding: EdgeInsets.symmetric(horizontal: 10, vertical: 10),
+                                  ),
+                                  onPressed: () {
+                                    setState(() {
+                                      search = '';
+                                      _nameController.clear();
+                                      filterMinQty = null;
+                                      filterMaxQty = null;
+                                      filterMinPrice = null;
+                                      filterMaxPrice = null;
+                                      // Only clear controllers here
+                                      _minQtyController.clear();
+                                      _maxQtyController.clear();
+                                      _minPriceController.clear();
+                                      _maxPriceController.clear();
+                                    });
+                                    _loadInventory();
+                                  },
                                 ),
                               ],
                             ),
@@ -689,10 +743,18 @@ class _InventoryScreenState extends State<InventoryScreen> {
   final _qtyController = TextEditingController();
   final _purchaseController = TextEditingController();
   final _saleController = TextEditingController();
+  final _minQtyController = TextEditingController();
+  final _maxQtyController = TextEditingController();
+  final _minPriceController = TextEditingController();
+  final _maxPriceController = TextEditingController();
   String? errorMsg;
   bool loading = true;
   bool saveEnabled = false;
   Timer? _searchDebounce;
+  Timer? _minQtyDebounce;
+  Timer? _maxQtyDebounce;
+  Timer? _minPriceDebounce;
+  Timer? _maxPriceDebounce;
 
   // Track edited expiry dates for items being edited
   final Map<int, String?> _editedExpiryDates = {};
@@ -714,6 +776,14 @@ class _InventoryScreenState extends State<InventoryScreen> {
   @override
   void dispose() {
     _searchDebounce?.cancel();
+    _minQtyDebounce?.cancel();
+    _maxQtyDebounce?.cancel();
+    _minPriceDebounce?.cancel();
+    _maxPriceDebounce?.cancel();
+    _minQtyController.dispose();
+    _maxQtyController.dispose();
+    _minPriceController.dispose();
+    _maxPriceController.dispose();
     super.dispose();
   }
 
@@ -954,8 +1024,8 @@ class _InventoryScreenState extends State<InventoryScreen> {
             ),
             if (isSorted)
               Icon(
-                _sortAsc ? MdiIcons.sortAscending : MdiIcons.sortDescending,
-                size: 20,
+                _sortAsc ? Icons.arrow_drop_up : Icons.arrow_drop_down,
+                size: 18,
                 color: Colors.blueGrey,
               ),
           ],

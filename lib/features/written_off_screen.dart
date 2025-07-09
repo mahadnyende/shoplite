@@ -787,8 +787,8 @@ class _WrittenOffScreenState extends State<WrittenOffScreen> {
                   ),
                   if (isSorted)
                     Icon(
-                      _sortAsc ? MdiIcons.sortAscending : MdiIcons.sortDescending,
-                      size: 20,
+                      _sortAsc ? Icons.arrow_drop_up : Icons.arrow_drop_down,
+                      size: 18,
                       color: Colors.blueGrey,
                     ),
                 ],

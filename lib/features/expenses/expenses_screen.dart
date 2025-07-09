@@ -565,13 +565,13 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
             if (onTap != null)
               Padding(
                 padding: const EdgeInsets.only(left: 2.0),
-                child: Icon(
-                  isSorted
-                      ? (sortAscending ? MdiIcons.sortAscending : MdiIcons.sortDescending)
-                      : MdiIcons.unfoldMoreHorizontal,
-                  size: 14,
-                  color: isSorted ? Colors.blue : Colors.grey,
-                ),
+                child: isSorted
+                    ? Icon(
+                        sortAscending ? Icons.arrow_drop_up : Icons.arrow_drop_down,
+                        size: 18,
+                        color: Colors.blueGrey,
+                      )
+                    : SizedBox(width: 18),
               ),
           ],
         ),
