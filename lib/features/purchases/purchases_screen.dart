@@ -156,36 +156,258 @@ class _PurchasesScreenState extends State<PurchasesScreen> {
   }
 
   Future<void> _showPaymentDialog(Map<String, dynamic> purchase) async {
-    // TODO: Implement payment dialog logic
+    final db = await AppDatabase.database;
+    final total = purchase['total'] ?? 0;
+    final amountPaid = purchase['amount_paid'] ?? 0;
+    final balance = total - amountPaid;
+    final controller = TextEditingController();
     await showDialog(
       context: context,
-      builder: (context) => AlertDialog(
-        title: Text('Payment'),
-        content: Text('Payment dialog not implemented.'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(),
-            child: Text('Close'),
-          ),
-        ],
-      ),
+      builder: (context) {
+        return StatefulBuilder(
+          builder: (context, setState) {
+            String? payWarning;
+            void updatePay(String value) {
+              int v = int.tryParse(value) ?? 0;
+              if (v > balance) {
+                v = balance;
+                payWarning = 'You cannot pay more than the remaining balance.';
+              } else {
+                payWarning = null;
+              }
+              if (v < 0) v = 0;
+              controller.text = v.toString();
+              controller.selection = TextSelection.fromPosition(TextPosition(offset: controller.text.length));
+              setState(() {});
+            }
+            return AlertDialog(
+              title: Text('Pay Invoice #${purchase['id']}'),
+              content: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text('Total: UGX $total'),
+                  Text('Already Paid: UGX $amountPaid'),
+                  Text('Balance: UGX $balance'),
+                  SizedBox(height: 12),
+                  TextField(
+                    controller: controller,
+                    keyboardType: TextInputType.number,
+                    decoration: InputDecoration(
+                      labelText: 'Amount to Pay',
+                      border: OutlineInputBorder(),
+                    ),
+                    onChanged: updatePay,
+                  ),
+                  if (payWarning != null)
+                    Padding(
+                      padding: const EdgeInsets.only(top: 8.0),
+                      child: Text(
+                        payWarning!,
+                        style: TextStyle(color: Colors.red, fontWeight: FontWeight.bold),
+                      ),
+                    ),
+                ],
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.of(context).pop(),
+                  child: Text('Cancel'),
+                ),
+                ElevatedButton(
+                  onPressed: () async {
+                    int payAmount = int.tryParse(controller.text.trim()) ?? 0;
+                    if (payAmount > balance) payAmount = balance;
+                    if (payAmount <= 0) return;
+                    final newPaid = amountPaid + payAmount;
+                    final newStatus = newPaid >= total ? 'Fully Paid' : 'Partially Paid';
+                    await db.update(
+                      'purchases',
+                      {
+                        'amount_paid': newPaid,
+                        'payment_status': newStatus,
+                      },
+                      where: 'id = ?',
+                      whereArgs: [purchase['id']],
+                    );
+                    // Insert payment record
+                    await db.insert('payments', {
+                      'invoice_id': purchase['id'],
+                      'amount': payAmount,
+                      'date': DateTime.now().toIso8601String(),
+                    });
+                    Navigator.of(context).pop();
+                    await _loadPurchases();
+                  },
+                  child: Text('Pay'),
+                ),
+              ],
+            );
+          },
+        );
+      },
     );
   }
 
   Future<void> _showReceiveGoodsDialog(Map<String, dynamic> purchase) async {
-    // TODO: Implement receive goods dialog logic
+    final db = await AppDatabase.database;
+    final List<Map<String, dynamic>> rawItems = await db.query(
+      'purchase_items',
+      where: 'purchase_id = ?',
+      whereArgs: [purchase['id']],
+    );
+    // Make items mutable and add a received_qty field if not present
+    final List<Map<String, dynamic>> items = rawItems.map((item) {
+      final mutable = Map<String, dynamic>.from(item);
+      if (!mutable.containsKey('received_qty')) {
+        mutable['received_qty'] = mutable['qty'] ?? 0;
+      }
+      return mutable;
+    }).toList();
+    // Helper to auto-select delivery status
+    String calcStatus() {
+      final total = items.length;
+      final fully = items.where((item) => (item['received_qty'] ?? 0) >= (item['qty'] ?? 0)).length;
+      final none = items.where((item) => (item['received_qty'] ?? 0) == 0).length;
+      if (fully == total) return 'Fully Received';
+      if (none == total) return 'Not Received';
+      return 'Partially Received';
+    }
+    String selectedStatus = calcStatus();
     await showDialog(
       context: context,
-      builder: (context) => AlertDialog(
-        title: Text('Receive Goods'),
-        content: Text('Receive goods dialog not implemented.'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(),
-            child: Text('Close'),
-          ),
-        ],
-      ),
+      builder: (context) {
+        return StatefulBuilder(
+          builder: (context, setState) {
+            void updateReceived(int i, String value) {
+              int v = int.tryParse(value) ?? 0;
+              final maxQty = items[i]['qty'] ?? 0;
+              if (v > maxQty) v = maxQty;
+              if (v < 0) v = 0;
+              items[i]['received_qty'] = v;
+              // Update the controller to reflect the capped value
+              items[i]['_controller']?.text = v.toString();
+              setState(() {
+                selectedStatus = calcStatus();
+              });
+            }
+            return AlertDialog(
+              title: Text('Receive Items for Invoice #${purchase['id']}'),
+              content: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    ...items.asMap().entries.map((entry) {
+                      final i = entry.key;
+                      final item = entry.value;
+                      // Use a controller for each item to allow programmatic updates
+                      item['_controller'] ??= TextEditingController(text: item['received_qty'].toString());
+                      item['_controller'].text = item['received_qty'].toString();
+                      return Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 4.0),
+                        child: Row(
+                          children: [
+                            Expanded(child: Text(item['stock_name'] ?? '', style: TextStyle(fontWeight: FontWeight.bold))),
+                            SizedBox(width: 8),
+                            Text('Ordered: ${item['qty']}', style: TextStyle(fontSize: 13)),
+                            SizedBox(width: 8),
+                            SizedBox(
+                              width: 70,
+                              child: TextField(
+                                controller: item['_controller'],
+                                keyboardType: TextInputType.number,
+                                decoration: InputDecoration(
+                                  labelText: 'Received',
+                                  isDense: true,
+                                  border: OutlineInputBorder(),
+                                ),
+                                onChanged: (v) => updateReceived(i, v),
+                              ),
+                            ),
+                          ],
+                        ),
+                      );
+                    }),
+                    SizedBox(height: 12),
+                    Row(
+                      children: [
+                        Text('Delivery Status: ', style: TextStyle(fontWeight: FontWeight.bold)),
+                        Chip(
+                          label: Text(selectedStatus),
+                          backgroundColor: selectedStatus == 'Fully Received'
+                              ? Colors.green.shade100
+                              : selectedStatus == 'Partially Received'
+                                  ? Colors.orange.shade100
+                                  : Colors.red.shade100,
+                          labelStyle: TextStyle(
+                            color: selectedStatus == 'Fully Received'
+                                ? Colors.green.shade900
+                                : selectedStatus == 'Partially Received'
+                                    ? Colors.orange.shade900
+                                    : Colors.red.shade900,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.of(context).pop(),
+                  child: Text('Cancel'),
+                ),
+                ElevatedButton(
+                  onPressed: () async {
+                    // Save received_qty for each item and update inventory
+                    for (final item in items) {
+                      await db.update(
+                        'purchase_items',
+                        {'received_qty': item['received_qty']},
+                        where: 'id = ?',
+                        whereArgs: [item['id']],
+                      );
+                      // Update inventory: add received_qty to inventory.qty
+                      final stockName = item['stock_name'];
+                      final receivedQty = item['received_qty'] ?? 0;
+                      if (receivedQty > 0) {
+                        // Find inventory record for this stock and branch
+                        final inv = await db.query(
+                          'inventory',
+                          where: 'name = ? AND branch_id = ?',
+                          whereArgs: [stockName, purchase['branch_id']],
+                        );
+                        if (inv.isNotEmpty) {
+                          final invId = inv.first['id'] as int;
+                          final currentQty = inv.first['qty'] as int? ?? 0;
+                          await db.update(
+                            'inventory',
+                            {'qty': currentQty + receivedQty},
+                            where: 'id = ?',
+                            whereArgs: [invId],
+                          );
+                        }
+                      }
+                    }
+                    // Save delivery_status
+                    await db.update(
+                      'purchases',
+                      {'delivery_status': selectedStatus},
+                      where: 'id = ?',
+                      whereArgs: [purchase['id']],
+                    );
+                    Navigator.of(context).pop();
+                    await _loadPurchases();
+                  },
+                  child: Text('Update'),
+                ),
+              ],
+            );
+          },
+        );
+      },
     );
   }
   int? hoveredRowIndex;
@@ -581,7 +803,7 @@ class _PurchasesScreenState extends State<PurchasesScreen> {
                                             Tooltip(
                                               message: 'View Invoice',
                                               child: IconButton(
-                                                icon: Icon(MdiIcons.receipt),
+                                                icon: Icon(MdiIcons.eye),
                                                 color: Colors.blue,
                                                 onPressed: () => _showViewInvoiceDialog(purchase),
                                               ),
@@ -724,7 +946,7 @@ class _PurchasesScreenState extends State<PurchasesScreen> {
         return AlertDialog(
           title: Row(
             children: [
-              Icon(MdiIcons.receipt, color: Colors.blue, size: 28),
+              Icon(MdiIcons.eye, color: Colors.blue, size: 28),
               SizedBox(width: 8),
               Text('Invoice #${purchase['id']}'),
             ],
@@ -908,7 +1130,9 @@ class _PurchasesScreenState extends State<PurchasesScreen> {
                           icon: Icon(MdiIcons.packageVariant),
                           label: Text('Receive'),
                           style: ElevatedButton.styleFrom(backgroundColor: Colors.teal),
-                          onPressed: () => _showReceiveGoodsDialog(purchase),
+                          onPressed: (purchase['delivery_status'] == 'Fully Received')
+                              ? null
+                              : () => _showReceiveGoodsDialog(purchase),
                         ),
                       ),
                       Tooltip(
