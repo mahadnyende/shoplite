@@ -824,7 +824,7 @@ class _PurchasesScreenState extends State<PurchasesScreen> {
                                   color: highlight ? Colors.blue.withOpacity(0.08) : null,
                                   child: Row(
                                     children: [
-                                      _dataCell((idx + 1).toString(), colNo),
+                                      _dataCell((filteredPurchases.length - idx).toString(), colNo),
                                       _dataCell(
                                         Text(
                                           purchase['supplier'] ?? '',

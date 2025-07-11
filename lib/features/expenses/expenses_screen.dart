@@ -39,7 +39,7 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
       'expenses',
       where: widget.branchId != null ? 'branch_id = ?' : null,
       whereArgs: widget.branchId != null ? [widget.branchId] : null,
-      orderBy: 'date DESC',
+      orderBy: 'id DESC',
     );
     setState(() {
       expenses = List<Map<String, dynamic>>.from(data);
@@ -280,7 +280,7 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
           color: highlight ? Colors.blue.withOpacity(0.08) : null,
           child: Row(
             children: [
-              Flexible(flex: 8, child: _dataCell((i + 1).toString(), double.infinity)),
+              Flexible(flex: 8, child: _dataCell((expenses.length - i).toString(), double.infinity)),
               Flexible(
                 flex: 38,
                 child: _dataCell(

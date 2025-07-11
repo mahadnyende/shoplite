@@ -66,7 +66,7 @@ class _WrittenOffScreenState extends State<WrittenOffScreen> {
       'written_off',
       where: where,
       whereArgs: whereArgs,
-      orderBy: 'written_off_at DESC',
+      orderBy: 'id DESC',
     );
     setState(() {
       writtenOff = data;
@@ -645,7 +645,7 @@ class _WrittenOffScreenState extends State<WrittenOffScreen> {
                                         color: highlight ? Colors.blue.withOpacity(0.08) : rowColor,
                                         child: Row(
                                           children: [
-                                            _dataCell((i + 1).toString(), colNo, fontWeight: FontWeight.bold),
+                                            _dataCell((filtered.length - i).toString(), colNo, fontWeight: FontWeight.bold),
                                             _dataCell(item['name'] ?? '', colName, icon: MdiIcons.cubeOutline),
                                             _dataCell(item['qty'].toString(), colQty),
                                             _dataCell('UGX ${formatter.format(_rowTotal(item))}', colValue),

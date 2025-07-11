@@ -70,7 +70,8 @@ class _SalesScreenState extends State<SalesScreen> {
     }
     final data = await db.query('sales', where: where, whereArgs: whereArgs);
     setState(() {
-      sales = List<Map<String, dynamic>>.from(data);
+      sales = List<Map<String, dynamic>>.from(data)
+        ..sort((a, b) => (b['id'] ?? 0).compareTo(a['id'] ?? 0)); // LIFO: newest first
       loading = false;
     });
   }
