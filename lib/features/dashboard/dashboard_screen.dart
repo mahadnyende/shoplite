@@ -323,7 +323,10 @@ class _DashboardOverviewState extends State<DashboardOverview> {
               final toOk = _to == null || (date != null && (_to == null || !date.isAfter(_to!)));
               return fromOk && toOk;
             }).toList();
-            // Sorting logic
+            // Ensure mutable and sort by id descending (latest first)
+            filtered = List<Map<String, dynamic>>.from(filtered);
+            filtered.sort((a, b) => (b['id'] ?? 0).compareTo(a['id'] ?? 0));
+            // Sorting logic (by column)
             filtered.sort((a, b) {
               int cmp = 0;
               switch (sortColumnIndex) {
@@ -493,6 +496,9 @@ class _DashboardOverviewState extends State<DashboardOverview> {
               final toOk = _to == null || (date != null && !date!.isAfter(_to!));
               return fromOk && toOk;
             }).toList();
+            // Ensure mutable and sort by id descending (latest first)
+            filtered = List<Map<String, dynamic>>.from(filtered);
+            filtered.sort((a, b) => (b['id'] ?? 0).compareTo(a['id'] ?? 0));
             // Sorting logic (LIFO: latest invoices on top by default)
             filtered.sort((a, b) {
               int cmp = 0;
@@ -737,19 +743,13 @@ class _DashboardOverviewState extends State<DashboardOverview> {
                                                 onPressed: () {
                                                   Navigator.of(context).pop();
                                                   Navigator.push(
-                                                    context,
-                                                    MaterialPageRoute(
-                                                      builder: (_) => Scaffold(
-                                                        appBar: AppBar(
-                                                          leading: BackButton(),
-                                                          title: Text('Purchases'),
-                                                        ),
-                                                        body: PurchasesScreen(
-                                                          branchId: widget.activeBranchId ?? 0,
-                                                          highlightInvoiceId: p['id'],
-                                                        ),
-                                                      ),
-                                                    ),
+                                                  context,
+                                                  MaterialPageRoute(
+                                                  builder: (_) => PurchasesScreen(
+                                                  branchId: widget.activeBranchId ?? 0,
+                                                  highlightInvoiceId: p['id'],
+                                                  ),
+                                                  ),
                                                   );
                                                 },
                                               ),

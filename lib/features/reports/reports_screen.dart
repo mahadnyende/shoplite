@@ -7,6 +7,7 @@ import 'package:pdf/pdf.dart';
 import 'package:printing/printing.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:flutter/services.dart' show rootBundle;
+import 'package:open_file/open_file.dart';
 import 'dart:io';
 import '../../core/db.dart';
 import '../../widgets/footer.dart';
@@ -36,6 +37,140 @@ class _ReportsScreenState extends State<ReportsScreen>
   String? productFilter;
   int? branchFilter;
   List<String> productNames = [];
+
+  // Prices Report state
+  String _pricesSearch = '';
+  Set<String> _selectedPricesItems = {};
+
+  Widget _buildPricesReportTab() {
+    List<Map<String, dynamic>> filtered = inventory.where((item) {
+      final name = (item['name'] ?? '').toString().toLowerCase();
+      return _pricesSearch.isEmpty || name.contains(_pricesSearch.toLowerCase());
+    }).toList();
+    filtered.sort((a, b) => (a['name'] ?? '').toString().compareTo((b['name'] ?? '').toString()));
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Expanded(
+              child: TextField(
+                decoration: InputDecoration(
+                  labelText: 'Search item',
+                  prefixIcon: Icon(Icons.search),
+                  border: OutlineInputBorder(),
+                  isDense: true,
+                ),
+                onChanged: (v) => setState(() => _pricesSearch = v),
+              ),
+            ),
+            SizedBox(width: 12),
+            ElevatedButton.icon(
+              icon: Icon(Icons.picture_as_pdf, color: Colors.red),
+              label: Text('Export Selected (PDF)'),
+              onPressed: _selectedPricesItems.isEmpty
+                  ? null
+                  : () async {
+                      await _printPricesReport(filtered.where((item) => _selectedPricesItems.contains(item['name'])).toList());
+                    },
+            ),
+            SizedBox(width: 8),
+            ElevatedButton.icon(
+              icon: Icon(Icons.picture_as_pdf, color: Colors.red),
+              label: Text('Export All (PDF)'),
+              onPressed: filtered.isEmpty
+                  ? null
+                  : () async {
+                      await _printPricesReport(filtered);
+                    },
+            ),
+          ],
+        ),
+        SizedBox(height: 16),
+        Expanded(
+          child: Card(
+            elevation: 2,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+            child: Padding(
+              padding: const EdgeInsets.all(16.0),
+              child: ListView.builder(
+                itemCount: filtered.length,
+                itemBuilder: (context, i) {
+                  final item = filtered[i];
+                  final selected = _selectedPricesItems.contains(item['name']);
+                  return CheckboxListTile(
+                    value: selected,
+                    onChanged: (v) {
+                      setState(() {
+                        if (v == true) {
+                          _selectedPricesItems.add(item['name']);
+                        } else {
+                          _selectedPricesItems.remove(item['name']);
+                        }
+                      });
+                    },
+                    title: Text(item['name'] ?? '', style: TextStyle(fontWeight: FontWeight.bold)),
+                    subtitle: Row(
+                      children: [
+                        Text('Purchase: UGX ${item['purchase'] ?? '-'}'),
+                        SizedBox(width: 24),
+                        Text('Sell: UGX ${item['sale'] ?? '-'}'),
+                      ],
+                    ),
+                  );
+                },
+              ),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Future<void> _printPricesReport(List<Map<String, dynamic>> items) async {
+    final pdf = pw.Document();
+    final prefs = await SharedPreferences.getInstance();
+    final businessName = prefs.getString('business_name') ?? 'Your Business Name';
+    final businessAddress = prefs.getString('business_address') ?? '123 Business St, City, Country';
+    final businessContact = prefs.getString('business_contact') ?? 'Contact: +123456789 | info@business.com';
+    final now = DateTime.now();
+    pdf.addPage(
+      pw.Page(
+        margin: pw.EdgeInsets.all(32),
+        build: (pw.Context context) => pw.Column(
+          crossAxisAlignment: pw.CrossAxisAlignment.start,
+          children: [
+            pw.Text(businessName, style: pw.TextStyle(fontSize: 22, fontWeight: pw.FontWeight.bold)),
+            pw.Text(businessAddress),
+            pw.Text(businessContact),
+            pw.Divider(),
+            pw.Text('Prices Report', style: pw.TextStyle(fontSize: 18, fontWeight: pw.FontWeight.bold)),
+            pw.Text('Generated: ${DateFormat('yyyy-MM-dd HH:mm').format(now)}'),
+            pw.SizedBox(height: 12),
+            pw.Table.fromTextArray(
+              headers: ['Item', 'Purchase Price', 'Sell Price'],
+              data: items.map((item) => [
+                item['name'] ?? '',
+                'UGX ${item['purchase'] ?? '-'}',
+                'UGX ${item['sale'] ?? '-'}',
+              ]).toList(),
+              headerStyle: pw.TextStyle(fontWeight: pw.FontWeight.bold, color: PdfColors.white),
+              headerDecoration: pw.BoxDecoration(color: PdfColors.blueGrey800),
+              cellAlignment: pw.Alignment.centerLeft,
+              cellStyle: pw.TextStyle(fontSize: 10),
+              border: pw.TableBorder.all(color: PdfColors.grey600, width: 0.5),
+            ),
+          ],
+        ),
+      ),
+    );
+    // Save PDF to a temporary file and open it
+    final bytes = await pdf.save();
+    final dir = await Directory.systemTemp.createTemp();
+    final file = File('${dir.path}/prices_report_${DateTime.now().millisecondsSinceEpoch}.pdf');
+    await file.writeAsBytes(bytes);
+    await OpenFile.open(file.path);
+  }
 
   // Sorting state for sales report
   String? salesSortColumn;
@@ -161,7 +296,7 @@ class _ReportsScreenState extends State<ReportsScreen>
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 6, vsync: this);
+    _tabController = TabController(length: 7, vsync: this);
     _loadData();
   }
 
@@ -376,6 +511,7 @@ class _ReportsScreenState extends State<ReportsScreen>
               Tab(child: Text('Balance Sheet', style: TextStyle(fontWeight: FontWeight.bold))),
               Tab(child: Text('Cash Flow', style: TextStyle(fontWeight: FontWeight.bold))),
               Tab(child: Text('Full Report', style: TextStyle(fontWeight: FontWeight.bold))),
+              Tab(child: Text('Prices Report', style: TextStyle(fontWeight: FontWeight.bold))),
             ],
           ),
           SizedBox(height: 8),
@@ -391,6 +527,7 @@ class _ReportsScreenState extends State<ReportsScreen>
                       _buildBalanceSheet(),
                       _buildCashFlow(),
                       _buildFullReport(),
+                      _buildPricesReportTab(),
                     ],
                   ),
           ),

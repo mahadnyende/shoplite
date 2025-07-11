@@ -455,8 +455,10 @@ class _PurchasesScreenState extends State<PurchasesScreen> {
 
   Future<void> _loadPurchases() async {
     final data = await AppDatabase.getPurchases(branchId: widget.branchId);
+    final mutableData = List<Map<String, dynamic>>.from(data);
+    mutableData.sort((a, b) => (b['id'] ?? 0).compareTo(a['id'] ?? 0));
     setState(() {
-      purchases = data;
+      purchases = mutableData;
     });
   }
 
