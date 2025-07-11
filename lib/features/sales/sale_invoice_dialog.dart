@@ -32,7 +32,6 @@ class _SaleInvoiceDialogState extends State<SaleInvoiceDialog> {
   bool isCredit = false;
   DateTime? dueDate;
 
-  // Persistent controllers for text fields
   late TextEditingController customerNameController;
   late TextEditingController customerContactController;
   late TextEditingController notesController;
@@ -83,23 +82,6 @@ class _SaleInvoiceDialogState extends State<SaleInvoiceDialog> {
     setState(() { loading = false; });
   }
 
-  Future<void> _loadItems() async {
-    setState(() { loading = true; });
-    if (widget.sale != null && sale['id'] != null) {
-      final db = await AppDatabase.database;
-      items = (await db.query('sale_items', where: 'sale_id = ?', whereArgs: [sale['id']])).map((row) => Map<String, dynamic>.from(row)).toList();
-      total = sale['amount'] ?? 0;
-      paid = sale['paid'] ?? 0;
-      balance = total - paid;
-    } else {
-      items = [];
-      total = 0;
-      paid = 0;
-      balance = 0;
-    }
-    setState(() { loading = false; });
-  }
-
   void _recalcTotal() {
     total = items.fold<int>(0, (sum, item) => sum + ((item['total'] ?? 0) as int));
     balance = total - paid;
@@ -113,9 +95,7 @@ class _SaleInvoiceDialogState extends State<SaleInvoiceDialog> {
         children: [
           Icon(MdiIcons.fileDocumentOutline, color: Colors.blue, size: 28),
           SizedBox(width: 8),
-          Text(mode == SaleInvoiceDialogMode.newSale
-              ? 'New Sale'
-              : 'Invoice #${sale['id'] ?? ''}'),
+          Text(mode == SaleInvoiceDialogMode.newSale ? 'New Sale' : 'Invoice #${sale['id'] ?? ''}'),
         ],
       ),
       content: SizedBox(
@@ -126,7 +106,6 @@ class _SaleInvoiceDialogState extends State<SaleInvoiceDialog> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    // Customer, Date, Credit
                     Card(
                       color: Colors.blueGrey[50],
                       margin: EdgeInsets.only(bottom: 12),
@@ -224,360 +203,359 @@ class _SaleInvoiceDialogState extends State<SaleInvoiceDialog> {
                         ),
                       ),
                     ),
-                    // Items Table
                     Card(
-                      elevation: 1,
-                      margin: EdgeInsets.only(bottom: 12),
-                      child: Padding(
-                        padding: const EdgeInsets.all(8.0),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Row(
-                              children: [
-                                SizedBox(
-                                  width: 200,
-                                  child: Text('Item', style: TextStyle(fontWeight: FontWeight.bold)),
-                                ),
-                                SizedBox(width: 8),
-                                SizedBox(
-                                  width: 60,
-                                  child: Text('Qty', style: TextStyle(fontWeight: FontWeight.bold)),
-                                ),
-                                SizedBox(width: 8),
-                                SizedBox(
-                                  width: 80,
-                                  child: Text('Price', style: TextStyle(fontWeight: FontWeight.bold)),
-                                ),
-                                SizedBox(width: 8),
-                                SizedBox(
-                                  width: 100,
-                                  child: Text('Total', style: TextStyle(fontWeight: FontWeight.bold)),
-                                ),
-                              ],
-                            ),
-                            Divider(),
-                            if (mode == SaleInvoiceDialogMode.edit || mode == SaleInvoiceDialogMode.newSale)
-                              ...items.asMap().entries.map((entry) {
+                    elevation: 1,
+                    margin: EdgeInsets.only(bottom: 12),
+                    child: Padding(
+                    padding: const EdgeInsets.all(8.0),
+                    child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                    // (Global search bar removed, revert to per-row search only)
+                    Row(
+                    children: [
+                    SizedBox(width: 200, child: Text('Item', style: TextStyle(fontWeight: FontWeight.bold))),
+                    SizedBox(width: 8),
+                    SizedBox(width: 60, child: Text('Qty', style: TextStyle(fontWeight: FontWeight.bold))),
+                    SizedBox(width: 8),
+                    SizedBox(width: 80, child: Text('Price', style: TextStyle(fontWeight: FontWeight.bold))),
+                    SizedBox(width: 8),
+                    SizedBox(width: 100, child: Text('Total', style: TextStyle(fontWeight: FontWeight.bold))),
+                    ],
+                    ),
+                    Divider(),
+                    if (mode == SaleInvoiceDialogMode.edit || mode == SaleInvoiceDialogMode.newSale)
+                    ...items.asMap().entries.map((entry) {
                                 final i = entry.key;
                                 final item = entry.value;
                                 item['qtyController'] ??= TextEditingController(text: item['qty']?.toString() ?? '');
                                 item['priceController'] ??= TextEditingController(text: item['price']?.toString() ?? '');
-                                return Padding(
-                                  padding: const EdgeInsets.symmetric(vertical: 2.0),
-                                  child: Row(
-                                    children: [
-                                      SizedBox(
-                                        width: 200,
-                                        child: TypeAheadField<Map<String, dynamic>>(
+                                final inv = inventory.firstWhere(
+                                (inv) => inv['name'].toString().toLowerCase() == (item['stock_name'] ?? '').toString().toLowerCase(),
+                                orElse: () => {},
+                                );
+                                final isRealInventoryItem = inv.isNotEmpty && (item['stock_name'] ?? '').toString().trim().isNotEmpty;
+                                final inStock = isRealInventoryItem
+                                ? ((inv['qty'] is int) ? inv['qty'] : int.tryParse(inv['qty']?.toString() ?? '') ?? 0)
+                                : 0;
+                                final isRowOutOfStock = isRealInventoryItem && inStock == 0;
+                                return Container(
+                                  decoration: isRowOutOfStock ? BoxDecoration(color: Colors.grey.shade200) : null,
+                                  child: Opacity(
+                                    opacity: isRowOutOfStock ? 0.6 : 1.0,
+                                    child: Row(
+                                      children: [
+                                        SizedBox(
+                                          width: 200,
+                                          child: IgnorePointer(
+                                          ignoring: isRowOutOfStock,
+                                          child: TypeAheadField<Map<String, dynamic>>(
                                           suggestionsCallback: (pattern) async {
-                                            try {
-                                              if (pattern.trim().isEmpty) return [];
-                                              final db = await AppDatabase.database;
-                                              final results = await db.query(
-                                                'inventory',
-                                                where: 'LOWER(name) LIKE ?',
-                                                whereArgs: ['%${pattern.toLowerCase()}%'],
-                                                limit: 20,
-                                              );
-                                              final alreadyInInvoice = items.map((it) => (it['stock_name'] ?? '').toString().toLowerCase()).toSet();
-                                              return results.where((inv) => !alreadyInInvoice.contains(inv['name'].toString().toLowerCase())).toList();
-                                            } catch (e) {
-                                              return [];
-                                            }
+                                          final p = pattern.trim().toLowerCase();
+                                          try {
+                                          final db = await AppDatabase.database;
+                                          final results = await db.query(
+                                          'inventory',
+                                          where: 'LOWER(name) LIKE ?',
+                                          whereArgs: ['%$p%'],
+                                          limit: 20,
+                                          );
+                                          final alreadyInInvoice = items.map((it) => (it['stock_name'] ?? '').toString().toLowerCase()).toSet();
+                                          final filtered = results.where((inv) => !alreadyInInvoice.contains(inv['name'].toString().toLowerCase())).toList();
+                                          // Sort by best match (startsWith > contains)
+                                          filtered.sort((a, b) {
+                                          final aName = a['name'].toString().toLowerCase();
+                                          final bName = b['name'].toString().toLowerCase();
+                                          if (aName.startsWith(p) && !bName.startsWith(p)) return -1;
+                                          if (!aName.startsWith(p) && bName.startsWith(p)) return 1;
+                                          return aName.compareTo(bName);
+                                          });
+                                          return filtered;
+                                          } catch (e) {
+                                          return [];
+                                          }
                                           },
                                           itemBuilder: (context, suggestion) {
-                                            final price = (suggestion['sale'] is int)
-                                                ? suggestion['sale']
-                                                : int.tryParse(suggestion['sale']?.toString() ?? '') ?? 0;
-                                            final name = suggestion['name'].toString().toLowerCase();
-                                            // Compute virtual stock for this item
-                                            int vStock = (suggestion['qty'] is int)
-                                                ? suggestion['qty']
-                                                : int.tryParse(suggestion['qty']?.toString() ?? '') ?? 0;
-                                            for (final it in items) {
-                                              if (it['stock_name']?.toString().toLowerCase() == name) {
-                                                int qty = (it['qty'] is int)
-                                                  ? it['qty']
-                                                  : int.tryParse(it['qty']?.toString() ?? '') ?? 0;
-                                                vStock -= qty;
-                                              }
-                                            }
-                                            final isOutOfStock = vStock <= 0;
-                                            return ListTile(
-                                              title: Text(
-                                                suggestion['name'],
-                                                style: isOutOfStock
-                                                    ? TextStyle(color: Colors.grey)
-                                                    : null,
-                                              ),
-                                              subtitle: Text('UGX $price | In stock: $vStock'),
-                                              enabled: !isOutOfStock,
-                                            );
+                                          final price = (suggestion['sale'] is int)
+                                          ? suggestion['sale']
+                                          : int.tryParse(suggestion['sale']?.toString() ?? '') ?? 0;
+                                          final name = suggestion['name'].toString().toLowerCase();
+                                          int vStock = (suggestion['qty'] is int)
+                                          ? suggestion['qty']
+                                          : int.tryParse(suggestion['qty']?.toString() ?? '') ?? 0;
+                                          for (final it in items) {
+                                          if (it['stock_name']?.toString().toLowerCase() == name) {
+                                          int qty = (it['qty'] is int)
+                                          ? it['qty']
+                                          : int.tryParse(it['qty']?.toString() ?? '') ?? 0;
+                                          vStock -= qty;
+                                          }
+                                          }
+                                          final isOutOfStock = vStock <= 0;
+                                          return ListTile(
+                                          title: Text(
+                                          suggestion['name'],
+                                          style: isOutOfStock ? TextStyle(color: Colors.grey) : null,
+                                          ),
+                                          subtitle: Text('UGX $price | In stock: $vStock'),
+                                          enabled: !isOutOfStock,
+                                          );
                                           },
                                           onSelected: (suggestion) {
-                                            final name = suggestion['name'].toString().toLowerCase();
-                                            // Compute virtual stock for this item
-                                            int vStock = (suggestion['qty'] is int)
-                                                ? suggestion['qty']
-                                                : int.tryParse(suggestion['qty']?.toString() ?? '') ?? 0;
-                                            for (final it in items) {
-                                              if (it['stock_name']?.toString().toLowerCase() == name) {
-                                                int qty = (it['qty'] is int)
-                                                  ? it['qty']
-                                                  : int.tryParse(it['qty']?.toString() ?? '') ?? 0;
-                                                vStock -= qty;
-                                              }
-                                            }
-                                            if (vStock <= 0) {
-                                              showDialog(
-                                                context: context,
-                                                builder: (context) => AlertDialog(
-                                                  title: Text('Out of Stock'),
-                                                  content: Text('This item is out of stock and cannot be added.'),
-                                                  actions: [
-                                                    TextButton(
-                                                      onPressed: () => Navigator.of(context).pop(),
-                                                      child: Text('OK'),
-                                                    ),
-                                                  ],
-                                                ),
-                                              );
-                                              return;
-                                            }
-                                            setState(() {
-                                              // Check if item already exists in the list (excluding current row)
-                                              final existingIndex = items.indexWhere((it) =>
-                                                it['stock_name']?.toString().toLowerCase() == name && it != items[i]);
-                                              final price = (suggestion['sale'] is int)
-                                                  ? suggestion['sale']
-                                                  : int.tryParse(suggestion['sale']?.toString() ?? '') ?? 0;
-                                              if (existingIndex != -1) {
-                                                // Increment quantity and update total for the existing item
-                                                final existingItem = items[existingIndex];
-                                                int newQty = (existingItem['qty'] ?? 0) + 1;
-                                                existingItem['qty'] = newQty;
-                                                existingItem['total'] = newQty * price;
-                                                if (existingItem['qtyController'] == null) {
-                                                  existingItem['qtyController'] = TextEditingController(text: newQty.toString());
-                                                } else {
-                                                  existingItem['qtyController'].text = newQty.toString();
-                                                }
-                                                if (existingItem['priceController'] == null) {
-                                                  existingItem['priceController'] = TextEditingController(text: price.toString());
-                                                } else {
-                                                  existingItem['priceController'].text = price.toString();
-                                                }
-                                                // Remove the current row (since it's a duplicate)
-                                                items.removeAt(i);
-                                              } else {
-                                                // Set item details for the current row
-                                                items[i]['stock_name'] = suggestion['name'];
-                                                items[i]['price'] = price;
-                                                items[i]['qty'] = 1;
-                                                items[i]['total'] = price;
-                                                if (item['qtyController'] == null) {
-                                                  item['qtyController'] = TextEditingController(text: '1');
-                                                } else {
-                                                  item['qtyController'].text = '1';
-                                                }
-                                                if (item['priceController'] == null) {
-                                                  item['priceController'] = TextEditingController(text: price.toString());
-                                                } else {
-                                                  item['priceController'].text = price.toString();
-                                                }
-                                              }
-                                              _recalcTotal();
-                                            });
+                                          final name = suggestion['name'].toString().toLowerCase();
+                                          // Prevent duplicate
+                                          if (items.any((it) => it != item && (it['stock_name'] ?? '').toString().toLowerCase() == name)) {
+                                          ScaffoldMessenger.of(context).showSnackBar(
+                                          SnackBar(content: Text('Item already added to sale.')),
+                                          );
+                                          return;
+                                          }
+                                          int vStock = (suggestion['qty'] is int)
+                                          ? suggestion['qty']
+                                          : int.tryParse(suggestion['qty']?.toString() ?? '') ?? 0;
+                                          for (final it in items) {
+                                          if (it['stock_name']?.toString().toLowerCase() == name) {
+                                          int qty = (it['qty'] is int)
+                                          ? it['qty']
+                                          : int.tryParse(it['qty']?.toString() ?? '') ?? 0;
+                                          vStock -= qty;
+                                          }
+                                          }
+                                          if (vStock <= 0) {
+                                          showDialog(
+                                          context: context,
+                                          builder: (context) => AlertDialog(
+                                          title: Text('Out of Stock'),
+                                          content: Text('This item is out of stock and cannot be added.'),
+                                          actions: [
+                                          TextButton(
+                                          onPressed: () => Navigator.of(context).pop(),
+                                          child: Text('OK'),
+                                          ),
+                                          ],
+                                          ),
+                                          );
+                                          return;
+                                          }
+                                          setState(() {
+                                          final price = (suggestion['sale'] is int)
+                                          ? suggestion['sale']
+                                          : int.tryParse(suggestion['sale']?.toString() ?? '') ?? 0;
+                                          item['stock_name'] = suggestion['name'];
+                                          item['price'] = price;
+                                          item['qty'] = 1;
+                                          item['total'] = price;
+                                          if (item['qtyController'] == null) {
+                                          item['qtyController'] = TextEditingController(text: '1');
+                                          } else {
+                                          item['qtyController'].text = '1';
+                                          }
+                                          if (item['priceController'] == null) {
+                                          item['priceController'] = TextEditingController(text: price.toString());
+                                          } else {
+                                          item['priceController'].text = price.toString();
+                                          }
+                                          // Focus the quantity field after selection
+                                          Future.delayed(Duration(milliseconds: 100), () {
+                                          if (item['qtyController'] != null) {
+                                          FocusScope.of(context).requestFocus(FocusNode());
+                                          }
+                                          });
+                                          _recalcTotal();
+                                          });
                                           },
                                           emptyBuilder: (context) => Padding(
-                                            padding: const EdgeInsets.all(8.0),
-                                            child: Text('No item found'),
+                                          padding: const EdgeInsets.all(8.0),
+                                          child: Text('No item found'),
                                           ),
                                           builder: (context, controller, focusNode) {
-                                            controller.text = item['stock_name'] ?? '';
-                                            controller.selection = TextSelection.fromPosition(TextPosition(offset: controller.text.length));
-                                            return TextField(
-                                              controller: controller,
-                                              focusNode: focusNode,
-                                              decoration: InputDecoration(
-                                                labelText: 'Search Item',
-                                                isDense: true,
-                                                contentPadding: EdgeInsets.symmetric(vertical: 6, horizontal: 6),
-                                              ),
-                                              onChanged: (v) {
-                                                setState(() {
-                                                  // Check if item exists in inventory
-                                                  final inv = inventory.firstWhere(
-                                                    (inv) => inv['name'].toString().toLowerCase() == v.toLowerCase(),
-                                                    orElse: () => {},
-                                                  );
-                                                  if (inv.isNotEmpty) {
-                                                    final inStock = (inv['qty'] is int)
-                                                        ? inv['qty']
-                                                        : int.tryParse(inv['qty']?.toString() ?? '') ?? 0;
-                                                    if (inStock == 0) {
-                                                      // Out of stock: clear field, show error, and do not allow typing
-                                                      WidgetsBinding.instance.addPostFrameCallback((_) {
-                                                        showDialog(
-                                                          context: context,
-                                                          builder: (context) => AlertDialog(
-                                                            title: Text('Out of Stock'),
-                                                            content: Text('This item is out of stock and cannot be added.'),
-                                                            actions: [
-                                                              TextButton(
-                                                                onPressed: () => Navigator.of(context).pop(),
-                                                                child: Text('OK'),
-                                                              ),
-                                                            ],
-                                                          ),
-                                                        );
-                                                      });
-                                                      items[i]['stock_name'] = null;
-                                                      items[i]['price'] = 0;
-                                                      items[i]['qty'] = 0;
-                                                      items[i]['total'] = 0;
-                                                      if (item['priceController'] != null) {
-                                                        item['priceController'].text = '0';
-                                                      }
-                                                      if (item['qtyController'] != null) {
-                                                        item['qtyController'].text = '0';
-                                                      }
-                                                      // Also clear the text field
-                                                      if (item['stock_name'] == null && item['qtyController'] != null) {
-                                                        item['qtyController'].text = '0';
-                                                      }
-                                                      return;
-                                                    } else {
-                                                      // In stock: allow
-                                                      items[i]['stock_name'] = v;
-                                                      final price = (inv['sale'] is int)
-                                                          ? inv['sale']
-                                                          : int.tryParse(inv['sale']?.toString() ?? '') ?? 0;
-                                                      items[i]['price'] = price;
-                                                      items[i]['total'] = (items[i]['qty'] ?? 0) * price;
-                                                      if (item['priceController'] == null) {
-                                                        item['priceController'] = TextEditingController(text: price.toString());
-                                                      } else {
-                                                        item['priceController'].text = price.toString();
-                                                      }
-                                                    }
-                                                  } else if (v.trim().isNotEmpty) {
-                                                    // If item does not exist in inventory, clear fields to prevent adding
-                                                    items[i]['stock_name'] = null;
-                                                    items[i]['price'] = 0;
-                                                    items[i]['qty'] = 0;
-                                                    items[i]['total'] = 0;
-                                                    if (item['priceController'] != null) {
-                                                      item['priceController'].text = '0';
-                                                    }
-                                                    if (item['qtyController'] != null) {
-                                                      item['qtyController'].text = '0';
-                                                    }
-                                                  }
-                                                });
-                                              },
-                                            );
-                                          },
-                                        ),
-                                      ),
-                                      SizedBox(width: 8),
-                                      SizedBox(
-                                        width: 60,
-                                        child: TextField(
-                                          controller: item['qtyController'],
-                                          keyboardType: TextInputType.number,
-                                          enabled: (() {
-                                            final inv = inventory.firstWhere(
-                                              (inv) => inv['name'].toString().toLowerCase() == (item['stock_name'] ?? '').toString().toLowerCase(),
-                                              orElse: () => {},
-                                            );
-                                            final inStock = inv.isNotEmpty
-                                              ? ((inv['qty'] is int) ? inv['qty'] : int.tryParse(inv['qty']?.toString() ?? '') ?? 0)
-                                              : 0;
-                                            return !(item['stock_name'] != null && inStock == 0);
-                                          })(),
-                                          decoration: InputDecoration(isDense: true, contentPadding: EdgeInsets.symmetric(vertical: 6, horizontal: 6)),
+                                          controller.text = item['stock_name'] ?? '';
+                                          controller.selection = TextSelection.fromPosition(TextPosition(offset: controller.text.length));
+                                          return TextField(
+                                          controller: controller,
+                                          focusNode: focusNode,
+                                          decoration: InputDecoration(
+                                          labelText: 'Search Item',
+                                          isDense: true,
+                                          contentPadding: EdgeInsets.symmetric(vertical: 6, horizontal: 6),
+                                          ),
                                           onChanged: (v) {
-                                            setState(() {
-                                              int enteredQty = int.tryParse(v) ?? 0;
-                                              // Find available stock for this item
-                                              int inStock = 0;
-                                              final inv = inventory.firstWhere(
-                                                (inv) => inv['name'].toString().toLowerCase() == (item['stock_name'] ?? '').toString().toLowerCase(),
-                                                orElse: () => {},
-                                              );
-                                              if (inv.isNotEmpty) {
-                                                inStock = (inv['qty'] is int)
-                                                  ? inv['qty']
-                                                  : int.tryParse(inv['qty']?.toString() ?? '') ?? 0;
-                                              }
-                                              if (enteredQty > inStock && inStock > 0) {
-                                                items[i]['qty'] = inStock;
-                                                item['qtyController'].text = inStock.toString();
-                                                showDialog(
-                                                  context: context,
-                                                  builder: (context) => AlertDialog(
-                                                    title: Text('Stock Limit'),
-                                                    content: Text('Cannot sell more than in stock ($inStock).'),
-                                                    actions: [
-                                                      TextButton(
-                                                        onPressed: () => Navigator.of(context).pop(),
-                                                        child: Text('OK'),
-                                                      ),
-                                                    ],
-                                                  ),
+                                          final vLower = v.trim().toLowerCase();
+                                          final inv = inventory.firstWhere(
+                                          (inv) => inv['name'].toString().toLowerCase() == vLower,
+                                          orElse: () => {},
+                                          );
+                                          if (v.isEmpty) {
+                                          setState(() {
+                                          item['stock_name'] = null;
+                                          item['price'] = 0;
+                                          item['qty'] = 0;
+                                          item['total'] = 0;
+                                          if (item['priceController'] != null) item['priceController'].text = '0';
+                                          if (item['qtyController'] != null) item['qtyController'].text = '0';
+                                          });
+                                          return;
+                                          }
+                                          // Prevent duplicate
+                                          if (items.any((it) => it != item && (it['stock_name'] ?? '').toString().toLowerCase() == vLower)) {
+                                          ScaffoldMessenger.of(context).showSnackBar(
+                                          SnackBar(content: Text('Item already added to sale.')),
+                                          );
+                                          setState(() {
+                                          item['stock_name'] = null;
+                                          item['price'] = 0;
+                                          item['qty'] = 0;
+                                          item['total'] = 0;
+                                          if (item['priceController'] != null) item['priceController'].text = '0';
+                                          if (item['qtyController'] != null) item['qtyController'].text = '0';
+                                          });
+                                          return;
+                                          }
+                                          if (inv.isNotEmpty) {
+                                          final inStock = (inv['qty'] is int)
+                                          ? inv['qty']
+                                          : int.tryParse(inv['qty']?.toString() ?? '') ?? 0;
+                                          if (inStock == 0) {
+                                          WidgetsBinding.instance.addPostFrameCallback((_) {
+                                          showDialog(
+                                          context: context,
+                                          builder: (context) => AlertDialog(
+                                          title: Text('Out of Stock'),
+                                          content: Text('This item is out of stock and cannot be added.'),
+                                          actions: [
+                                          TextButton(
+                                          onPressed: () => Navigator.of(context).pop(),
+                                          child: Text('OK'),
+                                          ),
+                                          ],
+                                          ),
+                                          );
+                                          });
+                                          setState(() {
+                                          item['stock_name'] = null;
+                                          item['price'] = 0;
+                                          item['qty'] = 0;
+                                          item['total'] = 0;
+                                          if (item['priceController'] != null) item['priceController'].text = '0';
+                                          if (item['qtyController'] != null) item['qtyController'].text = '0';
+                                          });
+                                          return;
+                                          } else {
+                                          final price = (inv['sale'] is int)
+                                          ? inv['sale']
+                                          : int.tryParse(inv['sale']?.toString() ?? '') ?? 0;
+                                          setState(() {
+                                          item['stock_name'] = inv['name'];
+                                          item['price'] = price;
+                                          item['qty'] = 1;
+                                          item['total'] = price;
+                                          if (item['priceController'] == null) {
+                                          item['priceController'] = TextEditingController(text: price.toString());
+                                          } else {
+                                          item['priceController'].text = price.toString();
+                                          }
+                                          if (item['qtyController'] == null) {
+                                          item['qtyController'] = TextEditingController(text: '1');
+                                          } else {
+                                          item['qtyController'].text = '1';
+                                          }
+                                          });
+                                          }
+                                          } else {
+                                          setState(() {
+                                          item['stock_name'] = v;
+                                          item['price'] = 0;
+                                          item['qty'] = 0;
+                                          item['total'] = 0;
+                                          if (item['priceController'] != null) item['priceController'].text = '0';
+                                          if (item['qtyController'] != null) item['qtyController'].text = '0';
+                                          });
+                                          }
+                                          },
+                                          );
+                                          },
+                                          ),
+                                          ),
+                                        ),
+                                        SizedBox(width: 8),
+                                        SizedBox(
+                                          width: 60,
+                                          child: TextField(
+                                            controller: item['qtyController'],
+                                            keyboardType: TextInputType.number,
+                                            enabled: !isRowOutOfStock,
+                                            decoration: InputDecoration(isDense: true, contentPadding: EdgeInsets.symmetric(vertical: 6, horizontal: 6)),
+                                            onChanged: (v) {
+                                              setState(() {
+                                                int enteredQty = int.tryParse(v) ?? 0;
+                                                int inStock = 0;
+                                                final inv = inventory.firstWhere(
+                                                  (inv) => inv['name'].toString().toLowerCase() == (item['stock_name'] ?? '').toString().toLowerCase(),
+                                                  orElse: () => {},
                                                 );
-                                              } else {
-                                                items[i]['qty'] = enteredQty;
-                                              }
-                                              items[i]['total'] = (items[i]['qty'] ?? 0) * (items[i]['price'] ?? 0);
-                                              _recalcTotal();
-                                            });
-                                          },
+                                                if (inv.isNotEmpty) {
+                                                  inStock = (inv['qty'] is int)
+                                                    ? inv['qty']
+                                                    : int.tryParse(inv['qty']?.toString() ?? '') ?? 0;
+                                                }
+                                                if (enteredQty > inStock && inStock > 0) {
+                                                  items[i]['qty'] = inStock;
+                                                  item['qtyController'].text = inStock.toString();
+                                                  showDialog(
+                                                    context: context,
+                                                    builder: (context) => AlertDialog(
+                                                      title: Text('Stock Limit'),
+                                                      content: Text('Cannot sell more than in stock ($inStock).'),
+                                                      actions: [
+                                                        TextButton(
+                                                          onPressed: () => Navigator.of(context).pop(),
+                                                          child: Text('OK'),
+                                                        ),
+                                                      ],
+                                                    ),
+                                                  );
+                                                } else {
+                                                  items[i]['qty'] = enteredQty;
+                                                }
+                                                items[i]['total'] = (items[i]['qty'] ?? 0) * (items[i]['price'] ?? 0);
+                                                _recalcTotal();
+                                              });
+                                            },
+                                          ),
                                         ),
-                                      ),
-                                      SizedBox(width: 8),
-                                      SizedBox(
-                                        width: 80,
-                                        child: TextField(
-                                          controller: item['priceController'],
-                                          keyboardType: TextInputType.number,
-                                          enabled: (() {
-                                            final inv = inventory.firstWhere(
-                                              (inv) => inv['name'].toString().toLowerCase() == (item['stock_name'] ?? '').toString().toLowerCase(),
-                                              orElse: () => {},
-                                            );
-                                            final inStock = inv.isNotEmpty
-                                              ? ((inv['qty'] is int) ? inv['qty'] : int.tryParse(inv['qty']?.toString() ?? '') ?? 0)
-                                              : 0;
-                                            return !(item['stock_name'] != null && inStock == 0);
-                                          })(),
-                                          decoration: InputDecoration(isDense: true, contentPadding: EdgeInsets.symmetric(vertical: 6, horizontal: 6)),
-                                          onChanged: (v) {
-                                            setState(() {
-                                              items[i]['price'] = int.tryParse(v) ?? 0;
-                                              items[i]['total'] = (items[i]['qty'] ?? 0) * (items[i]['price'] ?? 0);
-                                              _recalcTotal();
-                                            });
-                                          },
+                                        SizedBox(width: 8),
+                                        SizedBox(
+                                          width: 80,
+                                          child: TextField(
+                                            controller: item['priceController'],
+                                            keyboardType: TextInputType.number,
+                                            enabled: !isRowOutOfStock,
+                                            decoration: InputDecoration(isDense: true, contentPadding: EdgeInsets.symmetric(vertical: 6, horizontal: 6)),
+                                            onChanged: (v) {
+                                              setState(() {
+                                                items[i]['price'] = int.tryParse(v) ?? 0;
+                                                items[i]['total'] = (items[i]['qty'] ?? 0) * (items[i]['price'] ?? 0);
+                                                _recalcTotal();
+                                              });
+                                            },
+                                          ),
                                         ),
-                                      ),
-                                      SizedBox(width: 8),
-                                      SizedBox(
-                                        width: 100,
-                                        child: Text('UGX ${item['total'] ?? 0}', style: TextStyle(fontWeight: FontWeight.bold)),
-                                      ),
-                                      SizedBox(width: 8),
-                                      IconButton(
-                                        icon: Icon(MdiIcons.trashCanOutline, color: Colors.red),
-                                        tooltip: 'Remove Item',
-                                        onPressed: () => setState(() {
-                                          items.removeAt(i);
-                                          _recalcTotal();
-                                        }),
-                                      ),
-                                    ],
+                                        SizedBox(width: 8),
+                                        SizedBox(
+                                          width: 100,
+                                          child: Text('UGX ${item['total'] ?? 0}', style: TextStyle(fontWeight: FontWeight.bold)),
+                                        ),
+                                        SizedBox(width: 8),
+                                        IconButton(
+                                          icon: Icon(MdiIcons.trashCanOutline, color: Colors.red),
+                                          tooltip: 'Remove Item',
+                                          onPressed: () => setState(() {
+                                            items.removeAt(i);
+                                            _recalcTotal();
+                                          }),
+                                        ),
+                                      ],
+                                    ),
                                   ),
                                 );
                               }),
@@ -590,9 +568,7 @@ class _SaleInvoiceDialogState extends State<SaleInvoiceDialog> {
                                     label: Text('Add Item'),
                                     style: ElevatedButton.styleFrom(backgroundColor: Colors.green),
                                     onPressed: items.any((item) {
-                                      // Out-of-stock or invalid item: has a name but qty 0 or price 0
                                       if (item['stock_name'] != null && (item['qty'] == 0 || item['price'] == 0)) return true;
-                                      // Or, in inventory but out of stock
                                       final inv = inventory.firstWhere(
                                         (inv) => inv['name']?.toString().toLowerCase() == (item['stock_name'] ?? '').toString().toLowerCase(),
                                         orElse: () => {},
@@ -602,7 +578,7 @@ class _SaleInvoiceDialogState extends State<SaleInvoiceDialog> {
                                         : 0;
                                       return (item['stock_name'] != null && inStock == 0);
                                     })
-                                        ? null // Disable button
+                                        ? null
                                         : () {
                                             setState(() {
                                               items.add({
@@ -652,7 +628,6 @@ class _SaleInvoiceDialogState extends State<SaleInvoiceDialog> {
                         ),
                       ),
                     ),
-                    // Notes
                     Card(
                       color: Colors.amber[50],
                       margin: EdgeInsets.only(bottom: 12),
@@ -678,7 +653,6 @@ class _SaleInvoiceDialogState extends State<SaleInvoiceDialog> {
                         ),
                       ),
                     ),
-                    // Totals and Amount Paid
                     Padding(
                       padding: const EdgeInsets.symmetric(vertical: 8.0, horizontal: 2.0),
                       child: Row(
@@ -714,7 +688,6 @@ class _SaleInvoiceDialogState extends State<SaleInvoiceDialog> {
                         ],
                       ),
                     ),
-                    // Action Buttons
                     Center(
                       child: Wrap(
                         spacing: 8,
@@ -765,7 +738,6 @@ class _SaleInvoiceDialogState extends State<SaleInvoiceDialog> {
                                   );
                                   return;
                                 }
-                                // If not fully paid and no customer info, prompt for follow-up
                                 if (paid < total && (customerNameController.text.trim().isEmpty && customerContactController.text.trim().isEmpty)) {
                                   final shouldContinue = await showDialog<bool>(
                                     context: context,
@@ -796,7 +768,6 @@ class _SaleInvoiceDialogState extends State<SaleInvoiceDialog> {
                                 }
                                 final db = await AppDatabase.database;
                                 if (mode == SaleInvoiceDialogMode.newSale) {
-                                  // Robust inventory check before saving
                                   for (final item in items) {
                                     final inv = await db.query('inventory', where: 'name = ?', whereArgs: [item['stock_name']]);
                                     int inStock = 0;
@@ -825,7 +796,6 @@ class _SaleInvoiceDialogState extends State<SaleInvoiceDialog> {
                                       return;
                                     }
                                   }
-                                  // Determine payment status
                                   String paymentStatus;
                                   if (paid >= total) {
                                     paymentStatus = 'Fully Paid';
@@ -847,9 +817,7 @@ class _SaleInvoiceDialogState extends State<SaleInvoiceDialog> {
                                     'is_credit': (paid < total) ? 1 : 0,
                                     'due_date': (paid < total) && dueDate != null ? DateFormat('yyyy-MM-dd').format(dueDate!) : null,
                                   });
-                                  // Insert items
                                   for (final item in items) {
-                                    // Find the correct inventory row for this item and branch
                                     final inv = inventory.firstWhere(
                                       (inv) => inv['name'] == item['stock_name'] && (widget.branchId == null || inv['branch_id'] == widget.branchId),
                                       orElse: () => <String, dynamic>{},
@@ -902,10 +870,8 @@ class _SaleInvoiceDialogState extends State<SaleInvoiceDialog> {
                                     });
                                     await AppDatabase.updateInventory(inv['id'], {...inv, 'qty': newQty});
                                   }
-                                  // Refresh inventory after sale to ensure UI is up to date
                                   await _loadInventoryAndItems();
                                 } else if (mode == SaleInvoiceDialogMode.edit && sale['id'] != null) {
-                                  // Update sale
                                   await db.update('sales', {
                                     'date': DateFormat('yyyy-MM-dd').format(date!),
                                     'amount': total,
@@ -913,10 +879,8 @@ class _SaleInvoiceDialogState extends State<SaleInvoiceDialog> {
                                     'customer_contact': customerContact,
                                     'notes': notes,
                                   }, where: 'id = ?', whereArgs: [sale['id']]);
-                                  // Remove old items and restore inventory
                                   final oldItems = await db.query('sale_items', where: 'sale_id = ?', whereArgs: [sale['id']]);
                                   for (final old in oldItems) {
-                                    // Restore inventory
                                     final inv = inventory.firstWhere((inv) => inv['name'] == old['stock_name'], orElse: () => <String, dynamic>{});
                                     if (inv != null) {
                                       final newQty = (inv['qty'] ?? 0) + (old['qty'] ?? 0);
@@ -924,7 +888,6 @@ class _SaleInvoiceDialogState extends State<SaleInvoiceDialog> {
                                     }
                                     await AppDatabase.deleteSaleItem(old['id'] as int);
                                   }
-                                  // Add new items and update inventory
                                   for (final item in items) {
                                     await AppDatabase.addSaleItem({
                                       'sale_id': sale['id'],
@@ -933,7 +896,6 @@ class _SaleInvoiceDialogState extends State<SaleInvoiceDialog> {
                                       'price': item['price'],
                                       'total': item['total'],
                                     });
-                                    // Update inventory
                                     final inv = inventory.firstWhere((inv) => inv['name'] == item['stock_name'], orElse: () => <String, dynamic>{});
                                     if (inv != null) {
                                       final newQty = (inv['qty'] ?? 0) - (item['qty'] ?? 0);
@@ -950,131 +912,6 @@ class _SaleInvoiceDialogState extends State<SaleInvoiceDialog> {
                             style: ElevatedButton.styleFrom(backgroundColor: Colors.grey),
                             onPressed: () => Navigator.of(context).pop(),
                           ),
-                          if (mode == SaleInvoiceDialogMode.payment)
-                            Builder(
-                              builder: (context) {
-                                final controller = TextEditingController();
-                                return Column(
-                                  children: [
-                                    Padding(
-                                      padding: const EdgeInsets.symmetric(vertical: 8.0),
-                                      child: TextField(
-                                        controller: controller,
-                                        keyboardType: TextInputType.number,
-                                        decoration: InputDecoration(
-                                          labelText: 'Amount to receive',
-                                          border: OutlineInputBorder(),
-                                        ),
-                                      ),
-                                    ),
-                                    ElevatedButton.icon(
-                                      icon: Icon(MdiIcons.cashPlus),
-                                      label: Text('Receive Payment'),
-                                      style: ElevatedButton.styleFrom(backgroundColor: Colors.green),
-                                      onPressed: () async {
-                                        int pay = int.tryParse(controller.text.trim()) ?? 0;
-                                        if (pay <= 0 || pay > balance) {
-                                          ScaffoldMessenger.of(context).showSnackBar(
-                                            SnackBar(content: Text('Enter a valid payment amount.')),
-                                          );
-                                          return;
-                                        }
-                                        final db = await AppDatabase.database;
-                                        final newPaid = paid + pay;
-                                        final newStatus = (newPaid >= total) ? 'Fully Paid' : 'Partially Paid';
-                                        await db.update('sales', {
-                                          'paid': newPaid,
-                                          'payment_status': newStatus,
-                                        }, where: 'id = ?', whereArgs: [sale['id']]);
-                                        Navigator.of(context).pop();
-                                      },
-                                    ),
-                                  ],
-                                );
-                              },
-                            ),
-                          if (mode == SaleInvoiceDialogMode.returnGoods)
-                            Builder(
-                              builder: (context) {
-                                // Track return quantities for each item
-                                final List<TextEditingController> returnControllers = [
-                                  for (final item in items)
-                                    TextEditingController(text: '0')
-                                ];
-                                return Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Padding(
-                                      padding: const EdgeInsets.symmetric(vertical: 8.0),
-                                      child: Text('Enter quantity to return for each item:', style: TextStyle(fontWeight: FontWeight.bold)),
-                                    ),
-                                    ...items.asMap().entries.map((entry) {
-                                      final i = entry.key;
-                                      final item = entry.value;
-                                      return Padding(
-                                        padding: const EdgeInsets.symmetric(vertical: 4.0),
-                                        child: Row(
-                                          children: [
-                                            Expanded(child: Text(item['stock_name'] ?? '')),
-                                            SizedBox(width: 8),
-                                            Text('Sold: ${item['qty']}'),
-                                            SizedBox(width: 8),
-                                            SizedBox(
-                                              width: 80,
-                                              child: TextField(
-                                                controller: returnControllers[i],
-                                                keyboardType: TextInputType.number,
-                                                decoration: InputDecoration(
-                                                  labelText: 'Return',
-                                                  border: OutlineInputBorder(),
-                                                  isDense: true,
-                                                ),
-                                              ),
-                                            ),
-                                          ],
-                                        ),
-                                      );
-                                    }),
-                                    SizedBox(height: 8),
-                                    ElevatedButton.icon(
-                                      icon: Icon(MdiIcons.undoVariant),
-                                      label: Text('Process Return'),
-                                      style: ElevatedButton.styleFrom(backgroundColor: Colors.orangeAccent),
-                                      onPressed: () async {
-                                        final db = await AppDatabase.database;
-                                        bool anyReturn = false;
-                                        for (int i = 0; i < items.length; i++) {
-                                          final item = items[i];
-                                          int retQty = int.tryParse(returnControllers[i].text.trim()) ?? 0;
-                                          if (retQty > 0 && retQty <= (item['qty'] ?? 0)) {
-                                            anyReturn = true;
-                                            // Update sale item
-                                            final newQty = (item['qty'] ?? 0) - retQty;
-                                            final newTotal = newQty * (item['price'] ?? 0);
-                                            await db.update('sale_items', {
-                                              'qty': newQty,
-                                              'total': newTotal,
-                                            }, where: 'id = ?', whereArgs: [item['id']]);
-                                            // Update inventory
-                                            final inv = inventory.firstWhere((inv) => inv['name'] == item['stock_name'], orElse: () => <String, dynamic>{});
-                                            if (inv != null) {
-                                              final invQty = (inv['qty'] ?? 0) + retQty;
-                                              await AppDatabase.updateInventory(inv['id'], {...inv, 'qty': invQty});
-                                            }
-                                          }
-                                        }
-                                        if (anyReturn) {
-                                          await db.update('sales', {
-                                            'return_status': 'Returned',
-                                          }, where: 'id = ?', whereArgs: [sale['id']]);
-                                        }
-                                        Navigator.of(context).pop();
-                                      },
-                                    ),
-                                  ],
-                                );
-                              },
-                            ),
                         ],
                       ),
                     ),

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:shoplite/core/db.dart';
+import 'package:shoplite/features/purchases/purchase_form_dialog.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:pdf/pdf.dart';
 import 'package:printing/printing.dart';
@@ -11,13 +12,16 @@ import 'dart:typed_data';
 
 class PurchasesScreen extends StatefulWidget {
   final int branchId;
-  const PurchasesScreen({Key? key, required this.branchId}) : super(key: key);
+  final int? highlightInvoiceId;
+  const PurchasesScreen({Key? key, required this.branchId, this.highlightInvoiceId}) : super(key: key);
 
   @override
   _PurchasesScreenState createState() => _PurchasesScreenState();
 }
 
 class _PurchasesScreenState extends State<PurchasesScreen> {
+  final ScrollController _scrollController = ScrollController();
+  int? highlightedInvoiceId;
   Future<pw.Document> _generateInvoicePdf(
     Map<String, dynamic> purchase,
     List<Map<String, dynamic>> items,
@@ -426,6 +430,7 @@ class _PurchasesScreenState extends State<PurchasesScreen> {
   @override
   void initState() {
     super.initState();
+    highlightedInvoiceId = widget.highlightInvoiceId;
     _loadPurchases();
     _loadBusinessDetails();
   }
@@ -521,6 +526,28 @@ class _PurchasesScreenState extends State<PurchasesScreen> {
           return 0;
         }
       });
+    } else {
+      // Default: sort by date descending, fallback to id descending
+      filtered.sort((a, b) {
+        final aDate = a['date'] != null ? DateTime.tryParse(a['date']) : null;
+        final bDate = b['date'] != null ? DateTime.tryParse(b['date']) : null;
+        if (aDate != null && bDate != null) {
+          return bDate.compareTo(aDate); // latest first
+        } else {
+          // fallback to id descending
+          final aId = a['id'] ?? 0;
+          final bId = b['id'] ?? 0;
+          return bId.compareTo(aId);
+        }
+      });
+    }
+    // Move highlighted invoice to top if needed
+    if (widget.highlightInvoiceId != null) {
+      final idx = filtered.indexWhere((p) => p['id'] == widget.highlightInvoiceId);
+      if (idx > 0) {
+        final highlighted = filtered.removeAt(idx);
+        filtered.insert(0, highlighted);
+      }
     }
     return filtered;
   }
@@ -809,118 +836,141 @@ class _PurchasesScreenState extends State<PurchasesScreen> {
                         Divider(height: 1, thickness: 1),
                         Expanded(
                           child: ListView.builder(
+                            controller: _scrollController,
                             shrinkWrap: true,
                             physics: ClampingScrollPhysics(),
                             scrollDirection: Axis.vertical,
                             itemCount: filteredPurchases.length,
                             itemBuilder: (context, idx) {
                               final purchase = filteredPurchases[idx];
-                              final highlight = hoveredRowIndex == idx;
+                              final highlight = hoveredRowIndex == idx || (highlightedInvoiceId != null && purchase['id'] == highlightedInvoiceId);
                               final balance = (purchase['total'] ?? 0) - (purchase['amount_paid'] ?? 0);
+                              // Scroll to highlighted invoice after build
+                              if (highlightedInvoiceId != null && purchase['id'] == highlightedInvoiceId) {
+                                WidgetsBinding.instance.addPostFrameCallback((_) {
+                                  _scrollController.animateTo(
+                                    idx * 56.0, // Approximate row height
+                                    duration: Duration(milliseconds: 500),
+                                    curve: Curves.easeInOut,
+                                  );
+                                  setState(() {
+                                    highlightedInvoiceId = null;
+                                  });
+                                });
+                              }
                               return MouseRegion(
                                 onEnter: (_) => setState(() => hoveredRowIndex = idx),
                                 onExit: (_) => setState(() => hoveredRowIndex = null),
                                 child: Container(
-                                  color: highlight ? Colors.blue.withOpacity(0.08) : null,
-                                  child: Row(
-                                    children: [
-                                      _dataCell((filteredPurchases.length - idx).toString(), colNo),
-                                      _dataCell(
-                                        Text(
-                                          purchase['supplier'] ?? '',
-                                          style: TextStyle(fontSize: 13),
-                                        ),
-                                        colSupplier,
-                                      ),
-                                      _dataCell(
-                                        Text(
-                                          purchase['date'] ?? '',
-                                          style: TextStyle(fontSize: 13),
-                                        ),
-                                        colDate,
-                                      ),
-                                      _dataCell(
-                                        Chip(
-                                          label: Text(
-                                            purchase['delivery_status'] ?? '',
-                                            style: TextStyle(fontSize: 12),
+                                  decoration: highlight
+                                      ? BoxDecoration(
+                                          color: Colors.orange.withOpacity(0.18),
+                                          borderRadius: BorderRadius.circular(6),
+                                        )
+                                      : null,
+                                  width: double.infinity,
+                                  child: IntrinsicHeight(
+                                    child: Row(
+                                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                                      children: [
+                                        _dataCell((purchase['id'] ?? '').toString(), colNo),
+                                        _dataCell(
+                                          Text(
+                                            purchase['supplier'] ?? '',
+                                            style: TextStyle(fontSize: 13),
                                           ),
-                                          backgroundColor: purchase['delivery_status'] == 'Fully Received'
-                                              ? Colors.green.shade100
-                                              : purchase['delivery_status'] == 'Partially Received'
-                                                  ? Colors.orange.shade100
-                                                  : Colors.red.shade100,
-                                          labelStyle: TextStyle(
-                                            color: purchase['delivery_status'] == 'Fully Received'
-                                                ? Colors.green.shade900
+                                          colSupplier,
+                                        ),
+                                        _dataCell(
+                                          Text(
+                                            purchase['date'] ?? '',
+                                            style: TextStyle(fontSize: 13),
+                                          ),
+                                          colDate,
+                                        ),
+                                        _dataCell(
+                                          Chip(
+                                            label: Text(
+                                              purchase['delivery_status'] ?? '',
+                                              style: TextStyle(fontSize: 12),
+                                            ),
+                                            backgroundColor: purchase['delivery_status'] == 'Fully Received'
+                                                ? Colors.green.shade100
                                                 : purchase['delivery_status'] == 'Partially Received'
-                                                    ? Colors.orange.shade900
-                                                    : Colors.red.shade900,
-                                            fontWeight: FontWeight.bold,
-                                            fontSize: 12,
+                                                    ? Colors.orange.shade100
+                                                    : Colors.red.shade100,
+                                            labelStyle: TextStyle(
+                                              color: purchase['delivery_status'] == 'Fully Received'
+                                                  ? Colors.green.shade900
+                                                  : purchase['delivery_status'] == 'Partially Received'
+                                                      ? Colors.orange.shade900
+                                                      : Colors.red.shade900,
+                                              fontWeight: FontWeight.bold,
+                                              fontSize: 12,
+                                            ),
                                           ),
+                                          colDelivery,
                                         ),
-                                        colDelivery,
-                                      ),
-                                      _dataCell(
-                                        Chip(
-                                          label: Text(
-                                            purchase['payment_status'] ?? '',
-                                            style: TextStyle(fontSize: 12),
-                                          ),
-                                          backgroundColor: purchase['payment_status'] == 'Fully Paid'
-                                              ? Colors.green.shade100
-                                              : purchase['payment_status'] == 'Partially Paid'
-                                                  ? Colors.orange.shade100
-                                                  : Colors.red.shade100,
-                                          labelStyle: TextStyle(
-                                            color: purchase['payment_status'] == 'Fully Paid'
-                                                ? Colors.green.shade900
+                                        _dataCell(
+                                          Chip(
+                                            label: Text(
+                                              purchase['payment_status'] ?? '',
+                                              style: TextStyle(fontSize: 12),
+                                            ),
+                                            backgroundColor: purchase['payment_status'] == 'Fully Paid'
+                                                ? Colors.green.shade100
                                                 : purchase['payment_status'] == 'Partially Paid'
-                                                    ? Colors.orange.shade900
-                                                    : Colors.red.shade900,
-                                            fontWeight: FontWeight.bold,
-                                            fontSize: 12,
-                                          ),
-                                        ),
-                                        colPayment,
-                                      ),
-                                      _dataCell('UGX ${formatter.format(purchase['total'] ?? 0)}', colTotal),
-                                      _dataCell('UGX ${formatter.format(purchase['amount_paid'] ?? 0)}', colPaid),
-                                      _dataCell(
-                                        Text(
-                                          'UGX ${formatter.format(balance)}',
-                                          style: TextStyle(
-                                            color: balance > 0 ? Colors.red : Colors.green,
-                                            fontWeight: FontWeight.bold,
-                                          ),
-                                        ),
-                                        colBalance,
-                                      ),
-                                      _dataCell(
-                                        Row(
-                                          children: [
-                                            Tooltip(
-                                              message: 'View Invoice',
-                                              child: IconButton(
-                                                icon: Icon(MdiIcons.eye),
-                                                color: Colors.blue,
-                                                onPressed: () => _showViewInvoiceDialog(purchase),
-                                              ),
+                                                    ? Colors.orange.shade100
+                                                    : Colors.red.shade100,
+                                            labelStyle: TextStyle(
+                                              color: purchase['payment_status'] == 'Fully Paid'
+                                                  ? Colors.green.shade900
+                                                  : purchase['payment_status'] == 'Partially Paid'
+                                                      ? Colors.orange.shade900
+                                                      : Colors.red.shade900,
+                                              fontWeight: FontWeight.bold,
+                                              fontSize: 12,
                                             ),
-                                            Tooltip(
-                                              message: 'Edit Invoice',
-                                              child: IconButton(
-                                                icon: Icon(MdiIcons.pencil),
-                                                color: Colors.orange,
-                                                onPressed: () => _showEditPurchaseDialog(purchase),
-                                              ),
-                                            ),
-                                          ],
+                                          ),
+                                          colPayment,
                                         ),
-                                        colActions,
-                                      ),
-                                    ],
+                                        _dataCell('UGX ${formatter.format(purchase['total'] ?? 0)}', colTotal),
+                                        _dataCell('UGX ${formatter.format(purchase['amount_paid'] ?? 0)}', colPaid),
+                                        _dataCell(
+                                          Text(
+                                            'UGX ${formatter.format(balance)}',
+                                            style: TextStyle(
+                                              color: balance > 0 ? Colors.red : Colors.green,
+                                              fontWeight: FontWeight.bold,
+                                            ),
+                                          ),
+                                          colBalance,
+                                        ),
+                                        _dataCell(
+                                          Row(
+                                            children: [
+                                              Tooltip(
+                                                message: 'View Invoice',
+                                                child: IconButton(
+                                                  icon: Icon(MdiIcons.eye),
+                                                  color: Colors.blue,
+                                                  onPressed: () => _showViewInvoiceDialog(purchase),
+                                                ),
+                                              ),
+                                              Tooltip(
+                                                message: 'Edit Invoice',
+                                                child: IconButton(
+                                                  icon: Icon(MdiIcons.pencil),
+                                                  color: Colors.orange,
+                                                  onPressed: () => _showEditPurchaseDialog(purchase),
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                          colActions,
+                                        ),
+                                      ],
+                                    ),
                                   ),
                                 ),
                               );
@@ -1027,8 +1077,38 @@ class _PurchasesScreenState extends State<PurchasesScreen> {
   }
 
   Future<void> _showNewPurchaseDialog() async {
-    // Implementation from previous version (not shown here for brevity)
-    // You can copy the full dialog code from your backup or previous file version.
+    final result = await showDialog<Map<String, dynamic>>(
+      context: context,
+      builder: (context) => PurchaseFormDialog(),
+    );
+    if (result == null) return;
+    final db = await AppDatabase.database;
+    final supplier = result['supplier'] ?? '';
+    final date = result['date'] ?? DateTime.now().toString();
+    final items = List<Map<String, dynamic>>.from(result['items'] ?? []);
+    final total = items.fold<int>(0, (sum, item) => sum + ((item['total'] ?? 0) as int));
+    // Insert purchase
+    final purchaseId = await db.insert('purchases', {
+      'supplier': supplier,
+      'date': date,
+      'total': total,
+      'amount_paid': 0,
+      'payment_status': 'Unpaid',
+      'delivery_status': 'Not Received',
+      'branch_id': widget.branchId,
+    });
+    // Insert items
+    for (final item in items) {
+      await db.insert('purchase_items', {
+        'purchase_id': purchaseId,
+        'stock_name': item['name'],
+        'qty': item['qty'],
+        'purchase_price': item['purchase_price'],
+        'total': item['total'],
+        'received_qty': 0,
+      });
+    }
+    await _loadPurchases();
   }
 
   Future<void> _showViewInvoiceDialog(Map<String, dynamic> purchase) async {

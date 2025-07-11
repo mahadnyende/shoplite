@@ -3,6 +3,10 @@ import 'package:intl/intl.dart';
 import 'package:fl_chart/fl_chart.dart';
 import 'package:material_design_icons_flutter/material_design_icons_flutter.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:pdf/widgets.dart' as pw;
+import 'package:printing/printing.dart';
+import 'package:path_provider/path_provider.dart';
+import 'package:open_file/open_file.dart';
 import 'dart:io';
 import '../../core/db.dart';
 import '../../widgets/footer.dart';
@@ -40,8 +44,12 @@ class _DashboardOverviewState extends State<DashboardOverview> {
   List<Map<String, dynamic>> sales = [];
   List<Map<String, dynamic>> expenses = [];
   List<Map<String, dynamic>> writtenOff = [];
+  List<Map<String, dynamic>> purchases = [];
   int writtenOffValue = 0;
   String? _businessLogoPath;
+
+  int receivables = 0;
+  int payables = 0;
 
   // 0 = Month, 1 = Week, 2 = Day
   int _growthView = 0;
@@ -82,6 +90,9 @@ class _DashboardOverviewState extends State<DashboardOverview> {
         ? await AppDatabase.getExpenses(branchId: widget.activeBranchId)
         : [];
     final db = await AppDatabase.database;
+    final purchasesData = widget.activeBranchId != null
+        ? await db.query('purchases', where: 'branch_id = ?', whereArgs: [widget.activeBranchId])
+        : [];
     final writtenOffData = widget.activeBranchId != null
         ? await db.query(
             'written_off',
@@ -99,12 +110,29 @@ class _DashboardOverviewState extends State<DashboardOverview> {
           : int.tryParse(item['purchase']?.toString() ?? '') ?? 0;
       wValue += qty * purchase;
     }
+    // Calculate receivables (sales: amount - paid where paid < amount)
+    int rec = 0;
+    for (final s in salesData) {
+      final int amount = (s['amount'] is int) ? s['amount'] as int : int.tryParse(s['amount']?.toString() ?? '') ?? 0;
+      final int paid = (s['paid'] is int) ? s['paid'] as int : int.tryParse(s['paid']?.toString() ?? '') ?? 0;
+      if (paid < amount) rec += (amount - paid);
+    }
+    // Calculate payables (purchases: total - amount_paid where amount_paid < total)
+    int pay = 0;
+    for (final p in purchasesData) {
+      final int total = (p['total'] is int) ? p['total'] as int : int.tryParse(p['total']?.toString() ?? '') ?? 0;
+      final int paid = (p['amount_paid'] is int) ? p['amount_paid'] as int : int.tryParse(p['amount_paid']?.toString() ?? '') ?? 0;
+      if (paid < total) pay += (total - paid);
+    }
     setState(() {
       inventory = List<Map<String, dynamic>>.from(inv);
       sales = List<Map<String, dynamic>>.from(salesData);
       expenses = List<Map<String, dynamic>>.from(expensesData);
       writtenOff = List<Map<String, dynamic>>.from(writtenOffData);
+      purchases = List<Map<String, dynamic>>.from(purchasesData);
       writtenOffValue = wValue;
+      receivables = rec;
+      payables = pay;
       loading = false;
     });
   }
@@ -258,6 +286,770 @@ class _DashboardOverviewState extends State<DashboardOverview> {
       ),
     );
   }
+
+  void _showReceivablesDialog(BuildContext context) {
+    DateTime? fromDate;
+    DateTime? toDate;
+    List<Map<String, dynamic>> filtered = sales.where((s) {
+      final int amount = (s['amount'] is int) ? s['amount'] as int : int.tryParse(s['amount']?.toString() ?? '') ?? 0;
+      final int paid = (s['paid'] is int) ? s['paid'] as int : int.tryParse(s['paid']?.toString() ?? '') ?? 0;
+      if (paid >= amount) return false;
+      final date = s['date'] != null ? DateTime.tryParse(s['date']) : null;
+      final fromOk = fromDate == null || (date != null && !date.isBefore(fromDate));
+      final toOk = toDate == null || (date != null && !date.isAfter(toDate));
+      return fromOk && toOk;
+    }).toList();
+    // Persist sort state across dialog rebuilds
+    int sortColumnIndex = 2; // Default to Date
+    bool sortAscending = false; // LIFO
+    showDialog(
+      context: context,
+      builder: (context) {
+        DateTime? _from = fromDate;
+        DateTime? _to = toDate;
+        return StatefulBuilder(
+          builder: (context, setState) {
+            void updateSort(int i, bool asc) {
+              sortColumnIndex = i;
+              sortAscending = asc;
+              setState(() {});
+            }
+            List<Map<String, dynamic>> filtered = sales.where((s) {
+              final int amount = (s['amount'] is int) ? s['amount'] as int : int.tryParse(s['amount']?.toString() ?? '') ?? 0;
+              final int paid = (s['paid'] is int) ? s['paid'] as int : int.tryParse(s['paid']?.toString() ?? '') ?? 0;
+              if (paid >= amount) return false;
+              final date = s['date'] != null ? DateTime.tryParse(s['date']) : null;
+              final fromOk = _from == null || (date != null && (_from == null || !date.isBefore(_from!)));
+              final toOk = _to == null || (date != null && (_to == null || !date.isAfter(_to!)));
+              return fromOk && toOk;
+            }).toList();
+            // Sorting logic
+            filtered.sort((a, b) {
+              int cmp = 0;
+              switch (sortColumnIndex) {
+                case 0:
+                  cmp = (b['id'] ?? 0).compareTo(a['id'] ?? 0);
+                  break;
+                case 1:
+                  cmp = (b['customer_name'] ?? '').toString().compareTo((a['customer_name'] ?? '').toString());
+                  break;
+                case 2:
+                  cmp = (b['date'] ?? '').toString().compareTo((a['date'] ?? '').toString());
+                  break;
+                case 3:
+                  cmp = ((b['amount'] ?? 0) as int).compareTo((a['amount'] ?? 0) as int);
+                  break;
+                case 4:
+                  cmp = ((b['paid'] ?? 0) as int).compareTo((a['paid'] ?? 0) as int);
+                  break;
+                case 5:
+                  int balA = ((a['amount'] ?? 0) as int) - ((a['paid'] ?? 0) as int);
+                  int balB = ((b['amount'] ?? 0) as int) - ((b['paid'] ?? 0) as int);
+                  cmp = balB.compareTo(balA);
+                  break;
+                default:
+                  cmp = (b['id'] ?? 0).compareTo(a['id'] ?? 0);
+              }
+              return sortAscending ? -cmp : cmp;
+            });
+            return AlertDialog(
+              title: Text('Receivables (Debts)'),
+              content: SizedBox(
+                width: 800,
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    // Total value at the top
+                    Builder(
+                      builder: (context) {
+                        final formatter = NumberFormat.decimalPattern();
+                        int totalReceivables = 0;
+                        for (final s in filtered) {
+                          final int amount = (s['amount'] is int) ? s['amount'] as int : int.tryParse(s['amount']?.toString() ?? '') ?? 0;
+                          final int paid = (s['paid'] is int) ? s['paid'] as int : int.tryParse(s['paid']?.toString() ?? '') ?? 0;
+                          if (paid < amount) totalReceivables += (amount - paid);
+                        }
+                        return Padding(
+                          padding: const EdgeInsets.only(bottom: 8.0),
+                          child: Row(
+                            children: [
+                              Text(
+                                'Total Receivables: ',
+                                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                              ),
+                              Text(
+                                'UGX 	${formatter.format(totalReceivables)}',
+                                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: Colors.orange[800]),
+                              ),
+                            ],
+                          ),
+                        );
+                      },
+                    ),
+                    Row(
+                      children: [
+                        Text('From: '),
+                        TextButton(
+                          onPressed: () async {
+                            final picked = await showDatePicker(
+                              context: context,
+                              initialDate: _from ?? DateTime.now(),
+                              firstDate: DateTime(2000),
+                              lastDate: DateTime(2100),
+                            );
+                            if (picked != null) setState(() => _from = picked);
+                          },
+                          child: Text(_from != null ? DateFormat('yyyy-MM-dd').format(_from!) : 'Any'),
+                        ),
+                        SizedBox(width: 16),
+                        Text('To: '),
+                        TextButton(
+                          onPressed: () async {
+                            final picked = await showDatePicker(
+                              context: context,
+                              initialDate: _to ?? DateTime.now(),
+                              firstDate: DateTime(2000),
+                              lastDate: DateTime(2100),
+                            );
+                            if (picked != null) setState(() => _to = picked);
+                          },
+                          child: Text(_to != null ? DateFormat('yyyy-MM-dd').format(_to!) : 'Any'),
+                        ),
+                        TextButton.icon(
+                          icon: Icon(Icons.refresh, color: Colors.blue),
+                          label: Text('Reset Date Filters'),
+                          onPressed: () {
+                            setState(() {
+                              _from = null;
+                              _to = null;
+                            });
+                          },
+                        ),
+                        Spacer(),
+                        ElevatedButton.icon(
+                          icon: Icon(Icons.picture_as_pdf, color: Colors.red),
+                          label: Text('Export All to PDF'),
+                          onPressed: () async {
+                            await _exportAllInvoicesToPdf(context, filtered);
+                          },
+                        ),
+                      ],
+                    ),
+                    SizedBox(height: 8),
+                    StatefulBuilder(
+                      builder: (context, setState) {
+                        final verticalController = ScrollController();
+                        // Move hoveredRowIndex outside the builder to persist across rebuilds
+                        return _ReceivablesPayablesTable(
+                          filtered: filtered,
+                          sortColumnIndex: sortColumnIndex,
+                          sortAscending: sortAscending,
+                          verticalController: verticalController,
+                          isReceivables: true,
+                        );
+                      },
+                    ),
+                  ],
+                ),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.of(context).pop(),
+                  child: Text('Close'),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+  }
+
+  void _showPayablesDialog(BuildContext context) {
+    DateTime? fromDate;
+    DateTime? toDate;
+    int sortColumnIndex = 2; // Default to Date
+    bool sortAscending = false; // LIFO
+    showDialog(
+      context: context,
+      builder: (context) {
+        DateTime? _from = fromDate;
+        DateTime? _to = toDate;
+        return StatefulBuilder(
+          builder: (context, setState) {
+            void updateSort(int i, bool asc) {
+              setState(() {
+                sortColumnIndex = i;
+                sortAscending = asc;
+              });
+            }
+            // Filter purchases for payables (unpaid only, with optional date filter)
+            List<Map<String, dynamic>> filtered = purchases.where((p) {
+              final int total = (p['total'] is int) ? p['total'] as int : int.tryParse(p['total']?.toString() ?? '') ?? 0;
+              final int paid = (p['amount_paid'] is int) ? p['amount_paid'] as int : int.tryParse(p['amount_paid']?.toString() ?? '') ?? 0;
+              if (paid >= total) return false;
+              final date = p['date'] != null ? DateTime.tryParse(p['date']) : null;
+              final fromOk = _from == null || (date != null && !date!.isBefore(_from!));
+              final toOk = _to == null || (date != null && !date!.isAfter(_to!));
+              return fromOk && toOk;
+            }).toList();
+            // Sorting logic (LIFO: latest invoices on top by default)
+            filtered.sort((a, b) {
+              int cmp = 0;
+              switch (sortColumnIndex) {
+                case 0:
+                  cmp = (b['id'] ?? 0).compareTo(a['id'] ?? 0);
+                  break;
+                case 1:
+                  cmp = (b['supplier'] ?? '').toString().compareTo((a['supplier'] ?? '').toString());
+                  break;
+                case 2:
+                  // Sort by date descending (latest first)
+                  DateTime? dateA = a['date'] != null ? DateTime.tryParse(a['date']) : null;
+                  DateTime? dateB = b['date'] != null ? DateTime.tryParse(b['date']) : null;
+                  if (dateA == null && dateB == null) cmp = 0;
+                  else if (dateA == null) cmp = 1;
+                  else if (dateB == null) cmp = -1;
+                  else cmp = dateB.compareTo(dateA); // LIFO: latest first
+                  break;
+                case 3:
+                  cmp = ((b['total'] ?? 0) as int).compareTo((a['total'] ?? 0) as int);
+                  break;
+                case 4:
+                  cmp = ((b['amount_paid'] ?? 0) as int).compareTo((a['amount_paid'] ?? 0) as int);
+                  break;
+                case 5:
+                  int balA = ((a['total'] ?? 0) as int) - ((a['amount_paid'] ?? 0) as int);
+                  int balB = ((b['total'] ?? 0) as int) - ((b['amount_paid'] ?? 0) as int);
+                  cmp = balB.compareTo(balA);
+                  break;
+                default:
+                  cmp = (b['id'] ?? 0).compareTo(a['id'] ?? 0);
+              }
+              return sortAscending ? -cmp : cmp;
+            });
+            return AlertDialog(
+              title: Text('Payables (Unpaid)'),
+              content: SizedBox(
+                width: 800,
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    // Total value at the top
+                    Builder(
+                      builder: (context) {
+                        final formatter = NumberFormat.decimalPattern();
+                        int totalPayables = 0;
+                        for (final p in filtered) {
+                          final int total = (p['total'] is int) ? p['total'] as int : int.tryParse(p['total']?.toString() ?? '') ?? 0;
+                          final int paid = (p['amount_paid'] is int) ? p['amount_paid'] as int : int.tryParse(p['amount_paid']?.toString() ?? '') ?? 0;
+                          if (paid < total) totalPayables += (total - paid);
+                        }
+                        return Padding(
+                          padding: const EdgeInsets.only(bottom: 8.0),
+                          child: Row(
+                            children: [
+                              Text(
+                                'Total Payables: ',
+                                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                              ),
+                              Text(
+                                'UGX 	${formatter.format(totalPayables)}',
+                                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: Colors.purple[800]),
+                              ),
+                            ],
+                          ),
+                        );
+                      },
+                    ),
+                    Row(
+                      children: [
+                        Text('From: '),
+                        TextButton(
+                          onPressed: () async {
+                            final picked = await showDatePicker(
+                              context: context,
+                              initialDate: _from ?? DateTime.now(),
+                              firstDate: DateTime(2000),
+                              lastDate: DateTime(2100),
+                            );
+                            if (picked != null) setState(() => _from = picked);
+                          },
+                          child: Text(_from != null ? DateFormat('yyyy-MM-dd').format(_from!) : 'Any'),
+                        ),
+                        SizedBox(width: 16),
+                        Text('To: '),
+                        TextButton(
+                          onPressed: () async {
+                            final picked = await showDatePicker(
+                              context: context,
+                              initialDate: _to ?? DateTime.now(),
+                              firstDate: DateTime(2000),
+                              lastDate: DateTime(2100),
+                            );
+                            if (picked != null) setState(() => _to = picked);
+                          },
+                          child: Text(_to != null ? DateFormat('yyyy-MM-dd').format(_to!) : 'Any'),
+                        ),
+                        TextButton.icon(
+                          icon: Icon(Icons.refresh, color: Colors.blue),
+                          label: Text('Reset Date Filters'),
+                          onPressed: () {
+                            setState(() {
+                              _from = null;
+                              _to = null;
+                            });
+                          },
+                        ),
+                        Spacer(),
+                        ElevatedButton.icon(
+                          icon: Icon(Icons.picture_as_pdf, color: Colors.red),
+                          label: Text('Export All to PDF'),
+                          onPressed: () async {
+                            await _exportAllInvoicesToPdf(context, filtered);
+                          },
+                        ),
+                      ],
+                    ),
+                    SizedBox(height: 8),
+                    StatefulBuilder(
+                      builder: (context, setState) {
+                        final verticalController = ScrollController();
+                        int? hoveredRowIndex;
+                        return SizedBox(
+                          height: 400,
+                          child: Scrollbar(
+                            controller: verticalController,
+                            thumbVisibility: true,
+                            child: SingleChildScrollView(
+                              controller: verticalController,
+                              child: SingleChildScrollView(
+                                scrollDirection: Axis.horizontal,
+                                child: DataTable(
+                                  columnSpacing: 8.0,
+                                  sortColumnIndex: sortColumnIndex,
+                                  sortAscending: sortAscending,
+                                  columns: [
+                                    DataColumn(
+                                    label: Text('Invoice No.'),
+                                    onSort: (i, asc) {
+                                    updateSort(i, asc);
+                                    },
+                                    ),
+                                    DataColumn(
+                                    label: Text('Supplier'),
+                                    onSort: (i, asc) {
+                                    updateSort(i, asc);
+                                    },
+                                    ),
+                                    DataColumn(
+                                    label: Text('Date'),
+                                    onSort: (i, asc) {
+                                    updateSort(i, asc);
+                                    },
+                                    ),
+                                    DataColumn(
+                                    label: Text('Total'),
+                                    numeric: true,
+                                    onSort: (i, asc) {
+                                    updateSort(i, asc);
+                                    },
+                                    ),
+                                    DataColumn(
+                                    label: Text('Paid'),
+                                    numeric: true,
+                                    onSort: (i, asc) {
+                                    updateSort(i, asc);
+                                    },
+                                    ),
+                                    DataColumn(
+                                    label: Text('Balance'),
+                                    numeric: true,
+                                    onSort: (i, asc) {
+                                    updateSort(i, asc);
+                                    },
+                                    ),
+                                    DataColumn(label: Text('Actions')),
+                                  ],
+                                  rows: List<DataRow>.generate(filtered.length, (idx) {
+                                    final p = filtered[idx];
+                                    final int total = (p['total'] is int) ? p['total'] as int : int.tryParse(p['total']?.toString() ?? '') ?? 0;
+                                    final int paid = (p['amount_paid'] is int) ? p['amount_paid'] as int : int.tryParse(p['amount_paid']?.toString() ?? '') ?? 0;
+                                    final int balance = total - paid;
+                                    const cellTextStyle = TextStyle(fontSize: 12, overflow: TextOverflow.ellipsis);
+                                    return DataRow(
+                                      color: MaterialStateProperty.resolveWith<Color?>((states) {
+                                        if (hoveredRowIndex == idx) {
+                                          return Colors.orange.withOpacity(0.18);
+                                        }
+                                        return null;
+                                      }),
+                                      cells: [
+                                        DataCell(
+                                          MouseRegion(
+                                            onEnter: (_) => setState(() { hoveredRowIndex = idx; }),
+                                            onExit: (_) => setState(() { hoveredRowIndex = null; }),
+                                            child: Container(width: 60, child: Text((p['id'] ?? '').toString(), style: cellTextStyle)),
+                                          ),
+                                        ),
+                                        DataCell(
+                                          MouseRegion(
+                                            onEnter: (_) => setState(() { hoveredRowIndex = idx; }),
+                                            onExit: (_) => setState(() { hoveredRowIndex = null; }),
+                                            child: Container(width: 90, child: Text(p['supplier']?.toString() ?? '', style: cellTextStyle, maxLines: 1)),
+                                          ),
+                                        ),
+                                        DataCell(
+                                          MouseRegion(
+                                            onEnter: (_) => setState(() { hoveredRowIndex = idx; }),
+                                            onExit: (_) => setState(() { hoveredRowIndex = null; }),
+                                            child: Container(width: 80, child: Text(p['date']?.toString() ?? '', style: cellTextStyle, maxLines: 1)),
+                                          ),
+                                        ),
+                                        DataCell(
+                                          MouseRegion(
+                                            onEnter: (_) => setState(() { hoveredRowIndex = idx; }),
+                                            onExit: (_) => setState(() { hoveredRowIndex = null; }),
+                                            child: Container(width: 70, alignment: Alignment.centerRight, child: Text('UGX $total', style: cellTextStyle, maxLines: 1)),
+                                          ),
+                                        ),
+                                        DataCell(
+                                          MouseRegion(
+                                            onEnter: (_) => setState(() { hoveredRowIndex = idx; }),
+                                            onExit: (_) => setState(() { hoveredRowIndex = null; }),
+                                            child: Container(width: 70, alignment: Alignment.centerRight, child: Text('UGX $paid', style: cellTextStyle, maxLines: 1)),
+                                          ),
+                                        ),
+                                        DataCell(
+                                          MouseRegion(
+                                            onEnter: (_) => setState(() { hoveredRowIndex = idx; }),
+                                            onExit: (_) => setState(() { hoveredRowIndex = null; }),
+                                            child: Container(width: 80, alignment: Alignment.centerRight, child: Text('UGX $balance', style: cellTextStyle.copyWith(color: balance > 0 ? Colors.red : Colors.green), maxLines: 1)),
+                                          ),
+                                        ),
+                                        DataCell(
+                                          Row(
+                                            mainAxisSize: MainAxisSize.min,
+                                            children: [
+                                              IconButton(
+                                                icon: Icon(Icons.visibility, size: 18),
+                                                tooltip: 'View Invoice',
+                                                onPressed: () {
+                                                  Navigator.of(context).pop();
+                                                  Navigator.push(
+                                                    context,
+                                                    MaterialPageRoute(
+                                                      builder: (_) => Scaffold(
+                                                        appBar: AppBar(
+                                                          leading: BackButton(),
+                                                          title: Text('Purchases'),
+                                                        ),
+                                                        body: PurchasesScreen(
+                                                          branchId: widget.activeBranchId ?? 0,
+                                                          highlightInvoiceId: p['id'],
+                                                        ),
+                                                      ),
+                                                    ),
+                                                  );
+                                                },
+                                              ),
+                                              IconButton(
+                                                icon: Icon(Icons.picture_as_pdf, size: 18, color: Colors.red),
+                                                tooltip: 'Export to PDF',
+                                                onPressed: () async {
+                                                  await _exportInvoiceToPdf(context, p);
+                                                },
+                                              ),
+                                            ],
+                                          ),
+                                        ),
+                                      ],
+                                    );
+                                  }),
+                                ),
+                              ),
+                            ),
+                          ),
+                        );
+                      },
+                    ),
+                  ],
+                ),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.of(context).pop(),
+                  child: Text('Close'),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+  }
+
+  // Helper to filter purchases for payables dialog
+  List<Map<String, dynamic>> purchasesFiltered(DateTime? from, DateTime? to) {
+    return (widget.activeBranchId != null)
+        ? (context.findAncestorStateOfType<_DashboardOverviewState>()?.mounted ?? false)
+            ? (this as _DashboardOverviewState).getPayablesFiltered(from, to)
+            : []
+        : [];
+  }
+
+  // Actual filter logic for payables
+  List<Map<String, dynamic>> getPayablesFiltered(DateTime? from, DateTime? to) {
+    final db = AppDatabase.database;
+    // Use purchases from _loadData
+    final List<Map<String, dynamic>> purchasesData = (this as _DashboardOverviewState).getPurchasesFromState();
+    return purchasesData.where((p) {
+      final int total = (p['total'] is int) ? p['total'] as int : int.tryParse(p['total']?.toString() ?? '') ?? 0;
+      final int paid = (p['amount_paid'] is int) ? p['amount_paid'] as int : int.tryParse(p['amount_paid']?.toString() ?? '') ?? 0;
+      if (paid >= total) return false;
+      final date = p['date'] != null ? DateTime.tryParse(p['date']) : null;
+      final fromOk = from == null || (date != null && !date.isBefore(from));
+      final toOk = to == null || (date != null && !date.isAfter(to));
+      return fromOk && toOk;
+    }).toList();
+  }
+
+  // Helper to get purchases from state
+  List<Map<String, dynamic>> getPurchasesFromState() {
+    // Return the purchases loaded in _loadData
+    return purchases;
+  }
+
+  // Export invoice as PDF and save to device
+  Future<void> _exportInvoiceToPdf(BuildContext context, Map<String, dynamic> invoice) async {
+    final pdf = pw.Document();
+    final formatter = NumberFormat.decimalPattern();
+    pdf.addPage(
+      pw.Page(
+        build: (pw.Context context) {
+          return pw.Container(
+            padding: const pw.EdgeInsets.all(24),
+            child: pw.Column(
+              crossAxisAlignment: pw.CrossAxisAlignment.start,
+              children: [
+                pw.Text('INVOICE', style: pw.TextStyle(fontSize: 28, fontWeight: pw.FontWeight.bold)),
+                pw.SizedBox(height: 16),
+                pw.Text('Invoice No: ${invoice['id'] ?? ''}', style: pw.TextStyle(fontSize: 16)),
+                pw.Text('Customer: ${invoice['customer_name'] ?? ''}', style: pw.TextStyle(fontSize: 16)),
+                pw.Text('Date: ${invoice['date'] ?? ''}', style: pw.TextStyle(fontSize: 16)),
+                pw.SizedBox(height: 16),
+                pw.Text('Total: UGX ${formatter.format(invoice['amount'] ?? 0)}', style: pw.TextStyle(fontSize: 16)),
+                pw.Text('Paid: UGX ${formatter.format(invoice['paid'] ?? 0)}', style: pw.TextStyle(fontSize: 16)),
+                pw.Text('Balance: UGX ${formatter.format((invoice['amount'] ?? 0) - (invoice['paid'] ?? 0))}', style: pw.TextStyle(fontSize: 16)),
+                pw.SizedBox(height: 24),
+                pw.Text('Thank you for your business!', style: pw.TextStyle(fontSize: 14)),
+              ],
+            ),
+          );
+        },
+      ),
+    );
+    try {
+      final dir = await getApplicationDocumentsDirectory();
+      final file = File('${dir.path}/invoice_${invoice['id'] ?? DateTime.now().millisecondsSinceEpoch}.pdf');
+      await file.writeAsBytes(await pdf.save());
+      await OpenFile.open(file.path);
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Invoice exported to PDF: ${file.path}')),
+        );
+      }
+    } catch (e) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Failed to export PDF: $e')),
+        );
+      }
+    }
+  }
+
+  // Export all invoices as a single PDF
+  Future<void> _exportAllInvoicesToPdf(BuildContext context, List<Map<String, dynamic>> invoices) async {
+    if (invoices.isEmpty) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('No invoices to export.')),
+        );
+      }
+      return;
+    }
+    final pdf = pw.Document();
+    final formatter = NumberFormat.decimalPattern();
+    for (final invoice in invoices) {
+      pdf.addPage(
+        pw.Page(
+          build: (pw.Context context) {
+            return pw.Container(
+              padding: const pw.EdgeInsets.all(24),
+              child: pw.Column(
+                crossAxisAlignment: pw.CrossAxisAlignment.start,
+                children: [
+                  pw.Text('INVOICE', style: pw.TextStyle(fontSize: 28, fontWeight: pw.FontWeight.bold)),
+                  pw.SizedBox(height: 16),
+                  pw.Text('Invoice No: ${invoice['id'] ?? ''}', style: pw.TextStyle(fontSize: 16)),
+                  pw.Text('Customer: ${invoice['customer_name'] ?? ''}', style: pw.TextStyle(fontSize: 16)),
+                  pw.Text('Date: ${invoice['date'] ?? ''}', style: pw.TextStyle(fontSize: 16)),
+                  pw.SizedBox(height: 16),
+                  pw.Text('Total: UGX ${formatter.format(invoice['amount'] ?? 0)}', style: pw.TextStyle(fontSize: 16)),
+                  pw.Text('Paid: UGX ${formatter.format(invoice['paid'] ?? 0)}', style: pw.TextStyle(fontSize: 16)),
+                  pw.Text('Balance: UGX ${formatter.format((invoice['amount'] ?? 0) - (invoice['paid'] ?? 0))}', style: pw.TextStyle(fontSize: 16)),
+                  pw.SizedBox(height: 24),
+                  pw.Text('Thank you for your business!', style: pw.TextStyle(fontSize: 14)),
+                ],
+              ),
+            );
+          },
+        ),
+      );
+    }
+    try {
+      final dir = await getApplicationDocumentsDirectory();
+      final file = File('${dir.path}/all_invoices_${DateTime.now().millisecondsSinceEpoch}.pdf');
+      await file.writeAsBytes(await pdf.save());
+      await OpenFile.open(file.path);
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('All invoices exported to PDF: ${file.path}')),
+        );
+      }
+    } catch (e) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Failed to export all invoices: $e')),
+        );
+      }
+    }
+  }
+
+// Table widget for Receivables/Payables dialogs
+Widget _ReceivablesPayablesTable({
+  required List<Map<String, dynamic>> filtered,
+  required int sortColumnIndex,
+  required bool sortAscending,
+  required ScrollController verticalController,
+  required bool isReceivables,
+}) {
+  final cellTextStyle = const TextStyle(fontSize: 12, overflow: TextOverflow.ellipsis);
+  return SizedBox(
+    height: 400,
+    child: Scrollbar(
+      controller: verticalController,
+      thumbVisibility: true,
+      child: SingleChildScrollView(
+        controller: verticalController,
+        child: SingleChildScrollView(
+          scrollDirection: Axis.horizontal,
+          child: DataTable(
+            columnSpacing: 8.0,
+            sortColumnIndex: sortColumnIndex,
+            sortAscending: sortAscending,
+            columns: isReceivables
+                ? [
+                    DataColumn(
+                      label: Text('Invoice No.'),
+                    ),
+                    DataColumn(
+                      label: Text('Customer'),
+                    ),
+                    DataColumn(
+                      label: Text('Date'),
+                    ),
+                    DataColumn(
+                      label: Text('Total'),
+                      numeric: true,
+                    ),
+                    DataColumn(
+                      label: Text('Paid'),
+                      numeric: true,
+                    ),
+                    DataColumn(
+                      label: Text('Balance'),
+                      numeric: true,
+                    ),
+                    DataColumn(label: Text('Actions')),
+                  ]
+                : [
+                    DataColumn(
+                      label: Text('Invoice No.'),
+                    ),
+                    DataColumn(
+                      label: Text('Supplier'),
+                    ),
+                    DataColumn(
+                      label: Text('Date'),
+                    ),
+                    DataColumn(
+                      label: Text('Total'),
+                      numeric: true,
+                    ),
+                    DataColumn(
+                      label: Text('Paid'),
+                      numeric: true,
+                    ),
+                    DataColumn(
+                      label: Text('Balance'),
+                      numeric: true,
+                    ),
+                    DataColumn(label: Text('Actions')),
+                  ],
+            rows: List<DataRow>.generate(filtered.length, (idx) {
+              final item = filtered[idx];
+              final int total = isReceivables
+                  ? (item['amount'] is int)
+                      ? item['amount'] as int
+                      : int.tryParse(item['amount']?.toString() ?? '') ?? 0
+                  : (item['total'] is int)
+                      ? item['total'] as int
+                      : int.tryParse(item['total']?.toString() ?? '') ?? 0;
+              final int paid = isReceivables
+                  ? (item['paid'] is int)
+                      ? item['paid'] as int
+                      : int.tryParse(item['paid']?.toString() ?? '') ?? 0
+                  : (item['amount_paid'] is int)
+                      ? item['amount_paid'] as int
+                      : int.tryParse(item['amount_paid']?.toString() ?? '') ?? 0;
+              final int balance = total - paid;
+              return DataRow(
+                cells: [
+                  DataCell(Container(width: 60, child: Text((item['id'] ?? '').toString(), style: cellTextStyle))),
+                  DataCell(Container(width: 90, child: Text(isReceivables ? (item['customer_name']?.toString() ?? '') : (item['supplier']?.toString() ?? ''), style: cellTextStyle, maxLines: 1))),
+                  DataCell(Container(width: 80, child: Text(item['date']?.toString() ?? '', style: cellTextStyle, maxLines: 1))),
+                  DataCell(Container(width: 70, alignment: Alignment.centerRight, child: Text('UGX $total', style: cellTextStyle, maxLines: 1))),
+                  DataCell(Container(width: 70, alignment: Alignment.centerRight, child: Text('UGX $paid', style: cellTextStyle, maxLines: 1))),
+                  DataCell(Container(width: 80, alignment: Alignment.centerRight, child: Text('UGX $balance', style: cellTextStyle.copyWith(color: balance > 0 ? Colors.red : Colors.green), maxLines: 1))),
+                  DataCell(Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      IconButton(
+                        icon: Icon(Icons.visibility, size: 18),
+                        tooltip: isReceivables ? 'View Invoice' : 'View Purchase',
+                        onPressed: () {
+                          // Implement navigation to invoice or purchase details if needed
+                        },
+                      ),
+                      IconButton(
+                        icon: Icon(Icons.picture_as_pdf, size: 18, color: Colors.red),
+                        tooltip: 'Export to PDF',
+                        onPressed: () {
+                          // Implement export to PDF if needed
+                        },
+                      ),
+                    ],
+                  )),
+                ],
+              );
+            }),
+          ),
+        ),
+      ),
+    ),
+  );
+}
 
   @override
   Widget build(BuildContext context) {
@@ -765,17 +1557,25 @@ class _DashboardOverviewState extends State<DashboardOverview> {
                                 MdiIcons.trendingUp,
                                 Colors.teal[700],
                               ),
-                              this.summaryInfoBox(
-                                'Receivables (Debts)',
-                                0,
-                                MdiIcons.accountArrowRight,
-                                Colors.orange[700],
+                              InkWell(
+                                borderRadius: BorderRadius.circular(12),
+                                onTap: () => _showReceivablesDialog(context),
+                                child: this.summaryInfoBox(
+                                  'Receivables (Debts)',
+                                  receivables,
+                                  MdiIcons.accountArrowRight,
+                                  Colors.orange[700],
+                                ),
                               ),
-                              this.summaryInfoBox(
-                                'Payables (Unpaid)',
-                                0,
-                                MdiIcons.accountArrowLeft,
-                                Colors.purple[700],
+                              InkWell(
+                                borderRadius: BorderRadius.circular(12),
+                                onTap: () => _showPayablesDialog(context),
+                                child: this.summaryInfoBox(
+                                  'Payables (Unpaid)',
+                                  payables,
+                                  MdiIcons.accountArrowLeft,
+                                  Colors.purple[700],
+                                ),
                               ),
                             ],
                           ),

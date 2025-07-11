@@ -15,7 +15,8 @@ import 'sale_invoice_dialog.dart';
 
 class SalesScreen extends StatefulWidget {
   final int? branchId;
-  SalesScreen({this.branchId});
+  final int? highlightInvoiceId;
+  SalesScreen({this.branchId, this.highlightInvoiceId});
   @override
   _SalesScreenState createState() => _SalesScreenState();
 }
@@ -30,6 +31,7 @@ class _SalesScreenState extends State<SalesScreen> {
 
   // --- HOVER ROW HIGHLIGHT STATE ---
   int? hoveredRowIndex;
+  int? get highlightInvoiceId => widget.highlightInvoiceId;
 
   // Sorting state
   String? sortColumn;
@@ -69,9 +71,18 @@ class _SalesScreenState extends State<SalesScreen> {
       whereArgs.add('%${searchPayment.toLowerCase()}%');
     }
     final data = await db.query('sales', where: where, whereArgs: whereArgs);
+    List<Map<String, dynamic>> loadedSales = List<Map<String, dynamic>>.from(data)
+      ..sort((a, b) => (b['id'] ?? 0).compareTo(a['id'] ?? 0)); // LIFO: newest first
+    // Move highlighted invoice to top if needed
+    if (widget.highlightInvoiceId != null) {
+      int idx = loadedSales.indexWhere((s) => s['id'] == widget.highlightInvoiceId);
+      if (idx > 0) {
+        final highlighted = loadedSales.removeAt(idx);
+        loadedSales.insert(0, highlighted);
+      }
+    }
     setState(() {
-      sales = List<Map<String, dynamic>>.from(data)
-        ..sort((a, b) => (b['id'] ?? 0).compareTo(a['id'] ?? 0)); // LIFO: newest first
+      sales = loadedSales;
       loading = false;
     });
   }
@@ -455,7 +466,7 @@ class _SalesScreenState extends State<SalesScreen> {
                                         final paid = sale['paid'] ?? 0;
                                         final amount = sale['amount'] ?? 0;
                                         final balance = amount - paid;
-                                        final highlight = hoveredRowIndex == i;
+                                        final highlight = hoveredRowIndex == i || (highlightInvoiceId != null && sale['id'] == highlightInvoiceId);
                                         return MouseRegion(
                                           onEnter: (_) => setState(() => hoveredRowIndex = i),
                                           onExit: (_) => setState(() => hoveredRowIndex = null),
@@ -465,7 +476,7 @@ class _SalesScreenState extends State<SalesScreen> {
                                             child: AnimatedContainer(
                                               duration: Duration(milliseconds: 150),
                                               color: highlight
-                                                  ? Colors.blue.withOpacity(0.08)
+                                                  ? Colors.orange.withOpacity(0.18)
                                                   : (i % 2 == 0
                                                       ? Theme.of(context)
                                                           .colorScheme

@@ -19,6 +19,8 @@ dependencies:
   material_design_icons_flutter: ^7.0.7296
   syncfusion_flutter_datepicker: ^30.1.38
   flutter_typeahead: ^5.2.0
+  path_provider: ^2.0.15
+  open_file: ^3.3.2
 
 # ...rest of your pubspec.yaml
 
