@@ -853,9 +853,6 @@ class _PurchasesScreenState extends State<PurchasesScreen> {
                                     duration: Duration(milliseconds: 500),
                                     curve: Curves.easeInOut,
                                   );
-                                  setState(() {
-                                    highlightedInvoiceId = null;
-                                  });
                                 });
                               }
                               return MouseRegion(

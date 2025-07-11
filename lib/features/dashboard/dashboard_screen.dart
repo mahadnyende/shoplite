@@ -1029,7 +1029,35 @@ Widget _ReceivablesPayablesTable({
                         icon: Icon(Icons.visibility, size: 18),
                         tooltip: isReceivables ? 'View Invoice' : 'View Purchase',
                         onPressed: () {
-                          // Implement navigation to invoice or purchase details if needed
+                          if (!isReceivables) {
+                            Navigator.of(verticalController.position.context.storageContext).pop();
+                            Navigator.push(
+                              verticalController.position.context.storageContext,
+                              MaterialPageRoute(
+                                builder: (_) => PurchasesScreen(
+                                  branchId: item['branch_id'] ?? 0,
+                                  highlightInvoiceId: item['id'],
+                                ),
+                              ),
+                            );
+                          } else {
+                            Navigator.of(verticalController.position.context.storageContext).pop();
+                            Navigator.push(
+                              verticalController.position.context.storageContext,
+                              MaterialPageRoute(
+                                builder: (_) => Scaffold(
+                                  appBar: AppBar(
+                                    leading: BackButton(),
+                                    title: Text('Sales'),
+                                  ),
+                                  body: SalesScreen(
+                                    branchId: item['branch_id'] ?? 0,
+                                    highlightInvoiceId: item['id'],
+                                  ),
+                                ),
+                              ),
+                            );
+                          }
                         },
                       ),
                       IconButton(
