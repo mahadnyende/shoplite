@@ -11,6 +11,7 @@ import '../../core/db.dart';
 import '../../widgets/footer.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:material_design_icons_flutter/material_design_icons_flutter.dart';
+import 'sale_invoice_dialog.dart';
 
 class SalesScreen extends StatefulWidget {
   final int? branchId;
@@ -178,81 +179,61 @@ class _SalesScreenState extends State<SalesScreen> {
   Future<void> _showNewSaleDialog() async {
     await showDialog(
       context: context,
-      builder: (context) => AlertDialog(
-        title: Text('New Sale'),
-        content: Text('This is a placeholder for creating a new sale.'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(),
-            child: Text('Close'),
-          ),
-        ],
+      builder: (context) => SaleInvoiceDialog(
+        mode: SaleInvoiceDialogMode.newSale,
+        branchId: widget.branchId,
       ),
     );
+    _loadSales();
   }
 
   Future<void> _showSaleDetailsDialog(int saleId) async {
+    final sale = sales.firstWhere((s) => s['id'] == saleId, orElse: () => {});
     await showDialog(
       context: context,
-      builder: (context) => AlertDialog(
-        title: Text('Sale Details'),
-        content: Text('Details for sale ID: ' + saleId.toString()),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(),
-            child: Text('Close'),
-          ),
-        ],
+      builder: (context) => SaleInvoiceDialog(
+        sale: sale,
+        mode: SaleInvoiceDialogMode.view,
+        branchId: widget.branchId,
       ),
     );
+    _loadSales();
   }
 
   Future<void> _showPaymentDialog(Map<String, dynamic> sale) async {
     await showDialog(
       context: context,
-      builder: (context) => AlertDialog(
-        title: Text('Make Payment'),
-        content: Text('Make payment for sale ID: ' + (sale['id']?.toString() ?? '')), 
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(),
-            child: Text('Close'),
-          ),
-        ],
+      builder: (context) => SaleInvoiceDialog(
+        sale: sale,
+        mode: SaleInvoiceDialogMode.payment,
+        branchId: widget.branchId,
       ),
     );
+    _loadSales();
   }
 
   Future<void> _returnGoods(Map<String, dynamic> sale) async {
     await showDialog(
       context: context,
-      builder: (context) => AlertDialog(
-        title: Text('Return Goods'),
-        content: Text('Return goods for sale ID: ' + (sale['id']?.toString() ?? '')),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(),
-            child: Text('Close'),
-          ),
-        ],
+      builder: (context) => SaleInvoiceDialog(
+        sale: sale,
+        mode: SaleInvoiceDialogMode.returnGoods,
+        branchId: widget.branchId,
       ),
     );
+    _loadSales();
   }
 
   Future<void> _editInvoice(Map<String, dynamic> sale) async {
     await showDialog(
       context: context,
-      builder: (context) => AlertDialog(
-        title: Text('Edit Invoice'),
-        content: Text('Edit invoice for sale ID: ' + (sale['id']?.toString() ?? '')),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(),
-            child: Text('Close'),
-          ),
-        ],
+      builder: (context) => SaleInvoiceDialog(
+        sale: sale,
+        mode: SaleInvoiceDialogMode.edit,
+        branchId: widget.branchId,
       ),
     );
+    _loadSales();
   }
 
   @override

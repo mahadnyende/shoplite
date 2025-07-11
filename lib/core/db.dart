@@ -14,7 +14,7 @@ class AppDatabase {
     _db = await databaseFactoryFfi.openDatabase(
       path,
       options: OpenDatabaseOptions(
-        version: 7,
+        version: 8,
         onCreate: (db, version) async {
           print('DB onCreate called');
           await db.execute('''
@@ -303,6 +303,13 @@ class AppDatabase {
           } catch (e) {}
           try {
             await db.execute("ALTER TABLE sales ADD COLUMN return_status TEXT");
+          } catch (e) {}
+          // Add credit sales columns
+          try {
+            await db.execute("ALTER TABLE sales ADD COLUMN is_credit INTEGER DEFAULT 0");
+          } catch (e) {}
+          try {
+            await db.execute("ALTER TABLE sales ADD COLUMN due_date TEXT");
           } catch (e) {}
           await db.execute('''CREATE TABLE IF NOT EXISTS sale_items (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
