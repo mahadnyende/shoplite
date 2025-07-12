@@ -26,9 +26,28 @@ class _WrittenOffScreenState extends State<WrittenOffScreen> {
   bool _sortAsc = true;
   int? hoveredRowIndex;
 
+  List<Map<String, dynamic>> _branches = [];
+  int? _activeBranchId;
+  bool _loadingBranches = true;
+
   @override
   void initState() {
     super.initState();
+    _loadBranchesAndWrittenOff();
+  }
+
+  Future<void> _loadBranchesAndWrittenOff() async {
+    setState(() { _loadingBranches = true; });
+    final branches = await AppDatabase.getBranches();
+    int? activeBranchId = widget.branchId;
+    if (activeBranchId == null && branches.isNotEmpty) {
+      activeBranchId = branches.first['id'] as int;
+    }
+    setState(() {
+      _branches = branches;
+      _activeBranchId = activeBranchId;
+      _loadingBranches = false;
+    });
     _loadWrittenOff();
   }
 
@@ -48,7 +67,7 @@ class _WrittenOffScreenState extends State<WrittenOffScreen> {
       )
     ''');
     String where = 'branch_id = ?';
-    List whereArgs = [widget.branchId];
+    List whereArgs = [_activeBranchId];
     if (startDate != null && endDate != null) {
       where += ' AND written_off_at >= ? AND written_off_at <= ?';
       whereArgs.addAll([
@@ -76,7 +95,7 @@ class _WrittenOffScreenState extends State<WrittenOffScreen> {
 
   Future<void> _writeOffFromInventory() async {
     final db = await AppDatabase.database;
-    final inventory = await db.query('inventory', where: 'branch_id = ?', whereArgs: [widget.branchId]);
+    final inventory = await db.query('inventory', where: 'branch_id = ?', whereArgs: [_activeBranchId]);
     await showDialog(
       context: context,
       builder: (context) {
@@ -443,27 +462,65 @@ class _WrittenOffScreenState extends State<WrittenOffScreen> {
         onLogout: widget.onLogout ?? () {},
       ),
       appBar: AppBar(
-        leading: Builder(
-          builder: (context) => IconButton(
-            icon: Icon(MdiIcons.menuOpen, color: Colors.blueGrey, size: 28),
-            tooltip: 'Open navigation menu',
-            onPressed: () => Scaffold.of(context).openDrawer(),
-          ),
-        ),
         title: Row(
           children: [
-            Icon(MdiIcons.closeOctagonOutline, color: Colors.red, size: 28),
-            SizedBox(width: 8),
-            Text('Written Off Items'),
+            Text('Written Off'),
+            Spacer(),
+            if (!_loadingBranches && _branches.isNotEmpty)
+              Container(
+                padding: EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                decoration: BoxDecoration(
+                  color: Theme.of(context).brightness == Brightness.light
+                      ? Colors.grey[100]
+                      : Colors.grey[850],
+                  borderRadius: BorderRadius.circular(20),
+                  boxShadow: [
+                    if (Theme.of(context).brightness == Brightness.light)
+                      BoxShadow(
+                        color: Colors.black12,
+                        blurRadius: 4,
+                        offset: Offset(0, 2),
+                      ),
+                  ],
+                ),
+                child: Row(
+                  children: [
+                    Icon(MdiIcons.sourceBranch, size: 20, color: Colors.indigo),
+                    SizedBox(width: 6),
+                    DropdownButton<int?>(
+                      value: _activeBranchId,
+                      onChanged: (int? newBranchId) async {
+                        setState(() {
+                          _activeBranchId = newBranchId;
+                        });
+                        // If All Branches selected, do not set active branch in DB
+                        if (newBranchId != null) {
+                          await AppDatabase.setActiveBranch(newBranchId);
+                        }
+                        _loadWrittenOff();
+                      },
+                      items: [
+                        DropdownMenuItem<int?>(
+                          value: null,
+                          child: Text('All Branches'),
+                        ),
+                        ..._branches
+                            .where((b) => b['id'] != null)
+                            .map(
+                              (branch) => DropdownMenuItem<int?>(
+                                value: branch['id'] as int?,
+                                child: Text(branch['name'] as String),
+                              ),
+                            )
+                      ],
+                      underline: SizedBox(),
+                      icon: Icon(MdiIcons.chevronDown, size: 18, color: Colors.indigo),
+                    ),
+                  ],
+                ),
+              ),
           ],
         ),
-        actions: [
-          IconButton(
-            icon: Icon(MdiIcons.refresh),
-            tooltip: 'Refresh',
-            onPressed: _loadWrittenOff,
-          ),
-        ],
       ),
       floatingActionButton: FloatingActionButton.extended(
         icon: Icon(MdiIcons.plus, color: Colors.white),
@@ -471,11 +528,11 @@ class _WrittenOffScreenState extends State<WrittenOffScreen> {
         backgroundColor: Colors.red,
         onPressed: _writeOffFromInventory,
       ),
-      body: loading
+      body: loading || _loadingBranches
           ? Center(child: CircularProgressIndicator())
           : Column(
               children: [
-                Padding(
+                                Padding(
                   padding: const EdgeInsets.all(12.0),
                   child: Column(
                     children: [
@@ -563,18 +620,22 @@ class _WrittenOffScreenState extends State<WrittenOffScreen> {
                               _loadWrittenOff(startDate: _startDate, endDate: _endDate);
                             },
                           ),
-                          if (_startDate != null || _endDate != null)
-                            IconButton(
-                              icon: Icon(MdiIcons.closeCircleOutline, color: Colors.grey),
-                              tooltip: 'Clear Dates',
-                              onPressed: () {
-                                setState(() {
-                                  _startDate = null;
-                                  _endDate = null;
-                                });
-                                _loadWrittenOff();
-                              },
+                          SizedBox(width: 8),
+                          ElevatedButton.icon(
+                            icon: Icon(MdiIcons.filterRemove),
+                            label: Text('Reset Filters'),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: Colors.grey[300],
+                              foregroundColor: Colors.black,
                             ),
+                            onPressed: () {
+                              setState(() {
+                                _startDate = null;
+                                _endDate = null;
+                              });
+                              _loadWrittenOff();
+                            },
+                          ),
                         ],
                       ),
                     ],

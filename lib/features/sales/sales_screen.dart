@@ -445,6 +445,24 @@ class _SalesScreenState extends State<SalesScreen> {
                   }
                 },
               ),
+              SizedBox(width: 16),
+              ElevatedButton.icon(
+                icon: Icon(MdiIcons.filterRemove),
+                label: Text('Reset Filters'),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.grey[300],
+                  foregroundColor: Colors.black,
+                ),
+                onPressed: () {
+                  setState(() {
+                    searchInvoice = '';
+                    searchDate = '';
+                    searchEndDate = '';
+                    searchPayment = '';
+                  });
+                  _loadSales();
+                },
+              ),
             ],
           ),
           SizedBox(height: 16),

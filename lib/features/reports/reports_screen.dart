@@ -32,6 +32,7 @@ class _ReportsScreenState extends State<ReportsScreen>
   List<Map<String, dynamic>> purchases = [];
   List<Map<String, dynamic>> expenses = [];
   List<Map<String, dynamic>> inventory = [];
+  List<Map<String, dynamic>> writtenOff = [];
   DateTime? fromDate;
   DateTime? toDate;
   String? productFilter;
@@ -310,6 +311,12 @@ class _ReportsScreenState extends State<ReportsScreen>
     purchases = await AppDatabase.getPurchases(branchId: branchId);
     expenses = await AppDatabase.getExpenses(branchId: branchId);
     inventory = await AppDatabase.getInventory(branchId: branchId);
+    // Load written off data from DB if available, fallback to empty list if not implemented
+    try {
+      writtenOff = await AppDatabase.getWrittenOff(branchId: branchId);
+    } catch (e) {
+      writtenOff = [];
+    }
     productNames = inventory.map((e) => e['name'] as String).toSet().toList();
     setState(() {
       loading = false;
@@ -492,8 +499,6 @@ class _ReportsScreenState extends State<ReportsScreen>
   }
 
   Widget _buildWrittenOffReport() {
-    // Placeholder: You should load written off data from DB and add to state
-    final List<Map<String, dynamic>> writtenOff = [];
     final formatter = NumberFormat.decimalPattern();
     final totalWrittenOff = writtenOff.fold<int>(0, (sum, w) => sum + ((
       (w['qty'] is int ? w['qty'] as int : int.tryParse(w['qty']?.toString() ?? '') ?? 0) *
@@ -832,7 +837,9 @@ class _ReportsScreenState extends State<ReportsScreen>
                   Text('Branch:', style: theme.textTheme.bodyLarge),
                   SizedBox(width: 4),
                   DropdownButton<int>(
-                    value: branchFilter ?? widget.branchId,
+                    value: branches.any((branch) => branch['id'] == (branchFilter ?? widget.branchId))
+                        ? (branchFilter ?? widget.branchId)
+                        : null,
                     hint: Text('All'),
                     items: branches
                         .map(
@@ -843,10 +850,12 @@ class _ReportsScreenState extends State<ReportsScreen>
                         )
                         .toList(),
                     onChanged: (v) {
-                      branchFilter = v;
-                      productFilter = null;
-                      productNames = [];
-                      _loadData();
+                      setState(() {
+                        branchFilter = v;
+                        productFilter = null;
+                        productNames = [];
+                        _loadData();
+                      });
                     },
                   ),
                   SizedBox(width: 16),
@@ -871,11 +880,20 @@ class _ReportsScreenState extends State<ReportsScreen>
                   ),
                   SizedBox(width: 16),
                   Tooltip(
-                    message: 'Apply Filters',
+                    message: 'Reset all filters',
                     child: ElevatedButton.icon(
-                      icon: Icon(MdiIcons.filter),
-                      label: Text('Apply'),
-                      onPressed: _loadData,
+                      icon: Icon(Icons.refresh),
+                      label: Text('Reset Filters'),
+                      onPressed: () {
+                        setState(() {
+                          fromDate = null;
+                          toDate = null;
+                          branchFilter = null;
+                          productFilter = null;
+                          productNames = [];
+                          _loadData();
+                        });
+                      },
                       style: ElevatedButton.styleFrom(
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(8),
@@ -902,11 +920,11 @@ class _ReportsScreenState extends State<ReportsScreen>
               Tab(child: Text('Expenses', style: TextStyle(fontWeight: FontWeight.bold))),
               Tab(child: Text('Written Off', style: TextStyle(fontWeight: FontWeight.bold))),
               Tab(child: Text('Inventory', style: TextStyle(fontWeight: FontWeight.bold))),
+              Tab(child: Text('Prices Report', style: TextStyle(fontWeight: FontWeight.bold))),
               Tab(child: Text('Income Statement', style: TextStyle(fontWeight: FontWeight.bold))),
               Tab(child: Text('Balance Sheet', style: TextStyle(fontWeight: FontWeight.bold))),
               Tab(child: Text('Cash Flow', style: TextStyle(fontWeight: FontWeight.bold))),
               Tab(child: Text('Full Report', style: TextStyle(fontWeight: FontWeight.bold))),
-              Tab(child: Text('Prices Report', style: TextStyle(fontWeight: FontWeight.bold))),
             ],
           ),
           SizedBox(height: 8),
@@ -921,11 +939,11 @@ class _ReportsScreenState extends State<ReportsScreen>
                       _buildExpensesReport(),
                       _buildWrittenOffReport(),
                       _buildInventoryReport(),
+                      _buildPricesReportTab(),
                       _buildIncomeStatement(),
                       _buildBalanceSheet(),
                       _buildCashFlow(),
                       _buildFullReport(),
-                      _buildPricesReportTab(),
                     ],
                   ),
           ),

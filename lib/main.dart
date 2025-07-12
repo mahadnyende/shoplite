@@ -166,8 +166,11 @@ class _MainScreenState extends State<MainScreen> {
     });
     final branches = await AppDatabase.getBranches();
     final activeBranchId = await AppDatabase.getActiveBranch();
+    // Insert 'All Branches' option at the top
+    final allBranchesOption = {'id': null, 'name': 'All Branches'};
+    final filteredBranches = branches.where((b) => b['id'] != null).toList();
     setState(() {
-      _branches = branches;
+      _branches = [allBranchesOption, ...filteredBranches];
       _activeBranchId = activeBranchId;
       _loadingBranches = false;
     });
@@ -301,60 +304,65 @@ class _MainScreenState extends State<MainScreen> {
             SizedBox(width: 8),
             Text('ShopLite'),
             SizedBox(width: 16),
-            if (_activeBranchId != null)
-              Container(
-                padding: EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                decoration: BoxDecoration(
-                  color: Colors.blue.shade50,
-                  borderRadius: BorderRadius.circular(16),
-                  border: Border.all(color: Colors.blue.shade200),
-                ),
-                child: Row(
-                  children: [
-                    Icon(MdiIcons.sourceBranch, size: 20, color: Colors.indigo),
-                    SizedBox(width: 6),
-                    if (_branches.length > 1)
-                      DropdownButton<int>(
-                        value: _activeBranchId,
-                        onChanged: (int? newBranchId) async {
-                          if (newBranchId != null) {
-                            await _setActiveBranch(newBranchId);
-                            if (_selectedIndex == 1) setState(() {});
-                          }
-                        },
-                        items: _branches
-                            .map(
-                              (branch) => DropdownMenuItem<int>(
-                                value: branch['id'] as int,
-                                child: Text(_branchDisplayName(branch['name'])),
-                              ),
-                            )
-                            .toList(),
-                        underline: Container(),
-                        style: TextStyle(
-                          color: Colors.blue.shade900,
-                          fontWeight: FontWeight.bold,
-                        ),
-                        dropdownColor: Colors.white,
-                        icon: Icon(MdiIcons.chevronDown, color: Colors.blue),
-                      )
-                    else
-                      Text(
-                        _branchDisplayName(
-                          _branches.firstWhere(
-                            (b) => b['id'] == _activeBranchId,
-                            orElse: () => {'name': 'Branch'},
-                          )['name'],
-                        ),
-                        style: TextStyle(
-                          color: Colors.blue.shade900,
-                          fontWeight: FontWeight.bold,
-                          fontSize: 15,
-                        ),
-                      ),
-                  ],
-                ),
+            Container(
+              padding: EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+              decoration: BoxDecoration(
+                color: Colors.blue.shade50,
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: Colors.blue.shade200),
               ),
+              child: Row(
+                children: [
+                  Icon(MdiIcons.sourceBranch, size: 20, color: Colors.indigo),
+                  SizedBox(width: 6),
+                  if (_branches.length > 1)
+                    DropdownButton<int?>(
+                      value: _activeBranchId,
+                      onChanged: (int? newBranchId) async {
+                        setState(() {
+                          _activeBranchId = newBranchId;
+                        });
+                        if (newBranchId != null) {
+                          await _setActiveBranch(newBranchId);
+                          if (_selectedIndex == 1) setState(() {});
+                        } else {
+                          // If All Branches selected, do not set active branch in DB
+                          setState(() {});
+                        }
+                      },
+                      items: _branches
+                          .map(
+                            (branch) => DropdownMenuItem<int?>(
+                              value: branch['id'],
+                              child: Text(_branchDisplayName(branch['name'])),
+                            ),
+                          )
+                          .toList(),
+                      underline: Container(),
+                      style: TextStyle(
+                        color: Colors.blue.shade900,
+                        fontWeight: FontWeight.bold,
+                      ),
+                      dropdownColor: Colors.white,
+                      icon: Icon(MdiIcons.chevronDown, color: Colors.blue),
+                    )
+                  else
+                    Text(
+                      _branchDisplayName(
+                        _branches.firstWhere(
+                          (b) => b['id'] == _activeBranchId,
+                          orElse: () => {'name': 'Branch'},
+                        )['name'],
+                      ),
+                      style: TextStyle(
+                        color: Colors.blue.shade900,
+                        fontWeight: FontWeight.bold,
+                        fontSize: 15,
+                      ),
+                    ),
+                ],
+              ),
+            ),
           ],
         ),
         actions: [

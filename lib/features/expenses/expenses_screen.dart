@@ -212,6 +212,22 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
       },
       child: Text(toDate == null ? 'End' : DateFormat('yyyy-MM-dd').format(toDate!)),
       ),
+      SizedBox(width: 16),
+      ElevatedButton.icon(
+        icon: Icon(MdiIcons.filterRemove),
+        label: Text('Reset Filters'),
+        style: ElevatedButton.styleFrom(
+          backgroundColor: Colors.grey[300],
+          foregroundColor: Colors.black,
+        ),
+        onPressed: () {
+          setState(() {
+            fromDate = null;
+            toDate = null;
+          });
+          _loadExpenses();
+        },
+      ),
       Spacer(),
       Tooltip(
       message: 'Total Expenses',

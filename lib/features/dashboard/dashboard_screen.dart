@@ -51,6 +51,11 @@ class _DashboardOverviewState extends State<DashboardOverview> {
   int receivables = 0;
   int payables = 0;
 
+  // Branches for switcher
+  List<Map<String, dynamic>> _branches = [];
+  int? _selectedBranchId;
+  bool _loadingBranches = true;
+
   // 0 = Month, 1 = Week, 2 = Day
   int _growthView = 0;
 
@@ -58,7 +63,21 @@ class _DashboardOverviewState extends State<DashboardOverview> {
   void initState() {
     super.initState();
     _loadBusinessLogo();
+    _loadBranches();
     _loadData();
+  }
+
+  Future<void> _loadBranches() async {
+    setState(() { _loadingBranches = true; });
+    final branches = await AppDatabase.getBranches();
+    // Ensure 'All Branches' is always the first option and not duplicated
+    final allBranchesOption = {'id': null, 'name': 'All Branches'};
+    final filteredBranches = branches.where((b) => b['id'] != null).toList();
+    setState(() {
+      _branches = [allBranchesOption, ...filteredBranches];
+      _selectedBranchId = widget.activeBranchId;
+      _loadingBranches = false;
+    });
   }
 
   Future<void> _loadBusinessLogo() async {
@@ -72,6 +91,7 @@ class _DashboardOverviewState extends State<DashboardOverview> {
   void didUpdateWidget(covariant DashboardOverview oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.activeBranchId != widget.activeBranchId) {
+      _selectedBranchId = widget.activeBranchId;
       _loadData();
     }
   }
@@ -80,26 +100,29 @@ class _DashboardOverviewState extends State<DashboardOverview> {
     setState(() {
       loading = true;
     });
-    final inv = widget.activeBranchId != null
-        ? await AppDatabase.getInventory(branchId: widget.activeBranchId)
-        : [];
-    final salesData = widget.activeBranchId != null
-        ? await AppDatabase.getSales(branchId: widget.activeBranchId)
-        : [];
-    final expensesData = widget.activeBranchId != null
-        ? await AppDatabase.getExpenses(branchId: widget.activeBranchId)
-        : [];
     final db = await AppDatabase.database;
-    final purchasesData = widget.activeBranchId != null
-        ? await db.query('purchases', where: 'branch_id = ?', whereArgs: [widget.activeBranchId])
-        : [];
-    final writtenOffData = widget.activeBranchId != null
-        ? await db.query(
-            'written_off',
-            where: 'branch_id = ?',
-            whereArgs: [widget.activeBranchId],
-          )
-        : [];
+    List<Map<String, dynamic>> inv = [];
+    List<Map<String, dynamic>> salesData = [];
+    List<Map<String, dynamic>> expensesData = [];
+    List<Map<String, dynamic>> purchasesData = [];
+    List<Map<String, dynamic>> writtenOffData = [];
+    // Accept both null and 0 as "All Branches" for compatibility with AppBar switcher
+    final allBranchesSelected = (widget.activeBranchId == null || widget.activeBranchId == 0);
+    final branchId = allBranchesSelected ? null : widget.activeBranchId;
+    if (allBranchesSelected) {
+      // All branches: aggregate all data
+      inv = await AppDatabase.getInventory();
+      salesData = await AppDatabase.getSales();
+      expensesData = await AppDatabase.getExpenses();
+      purchasesData = await db.query('purchases');
+      writtenOffData = await db.query('written_off');
+    } else {
+      inv = await AppDatabase.getInventory(branchId: branchId);
+      salesData = await AppDatabase.getSales(branchId: branchId);
+      expensesData = await AppDatabase.getExpenses(branchId: branchId);
+      purchasesData = await db.query('purchases', where: 'branch_id = ?', whereArgs: [branchId]);
+      writtenOffData = await db.query('written_off', where: 'branch_id = ?', whereArgs: [branchId]);
+    }
     int wValue = 0;
     for (final item in writtenOffData) {
       final int qty = (item['qty'] is int)
@@ -1314,7 +1337,7 @@ Widget _ReceivablesPayablesTable({
                               ],
                             ),
                           ),
-                        ],
+                                                  ],
                       ),
                     ),
                   ),
@@ -1480,6 +1503,46 @@ Widget _ReceivablesPayablesTable({
                     ),
                   ),
                   SizedBox(height: 24),
+                  // Branch Switcher
+                  if (_branches.isNotEmpty)
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: 18.0),
+                      child: Row(
+                        children: [
+                          Text('Branch: ', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                          SizedBox(width: 12),
+                          DropdownButton<int?>(
+                            value: _selectedBranchId,
+                            items: _branches.map((branch) {
+                              return DropdownMenuItem<int?>(
+                                value: branch['id'],
+                                child: Text(branch['name'] ?? 'Unknown'),
+                              );
+                            }).toList(),
+                            onChanged: (value) {
+                              setState(() {
+                                _selectedBranchId = value;
+                              });
+                              // Update the dashboard to show data for the selected branch (or all)
+                              Navigator.pushReplacement(
+                                context,
+                                PageRouteBuilder(
+                                  pageBuilder: (context, animation1, animation2) => DashboardOverview(
+                                    activeBranchId: value,
+                                    businessName: widget.businessName,
+                                    userName: widget.userName,
+                                    userRole: widget.userRole,
+                                    userPhotoUrl: widget.userPhotoUrl,
+                                  ),
+                                  transitionDuration: Duration.zero,
+                                  reverseTransitionDuration: Duration.zero,
+                                ),
+                              );
+                            },
+                          ),
+                        ],
+                      ),
+                    ),
                   // Inventory Value Summary Card (single row)
                   Row(
                     children: [

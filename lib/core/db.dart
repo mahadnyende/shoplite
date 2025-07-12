@@ -535,6 +535,21 @@ class AppDatabase {
     }
   }
 
+  // Written Off
+  static Future<List<Map<String, dynamic>>> getWrittenOff({int? branchId}) async {
+    final db = await database;
+    if (branchId != null) {
+      return await db.query(
+        'written_off',
+        where: 'branch_id = ?',
+        whereArgs: [branchId],
+        orderBy: 'written_off_at DESC',
+      );
+    } else {
+      return await db.query('written_off', orderBy: 'written_off_at DESC');
+    }
+  }
+
   static Future<int> addExpense(Map<String, dynamic> expense) async {
     final db = await database;
     return await db.insert(
