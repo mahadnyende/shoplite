@@ -139,6 +139,24 @@ class _InventoryScreenState extends State<InventoryScreen> {
                       ],
                     ),
                   ),
+                  SizedBox(width: 16),
+                  Tooltip(
+                    message: 'Total inventory value (sum of purchase price x quantity)',
+                    child: Row(
+                      children: [
+                        Icon(MdiIcons.cash, color: Colors.orange[700], size: 22),
+                        SizedBox(width: 4),
+                        Text(
+                          'UGX ${formatter.format(inventoryValue)}',
+                          style: TextStyle(
+                            color: Colors.orange[700],
+                            fontWeight: FontWeight.bold,
+                            fontSize: 16,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
                 ],
               ),
             ),
@@ -880,6 +898,18 @@ class _InventoryScreenState extends State<InventoryScreen> {
                 (item['purchase'] is int
                     ? item['purchase'] as int
                     : int.tryParse(item['purchase'].toString()) ?? 0)) *
+            (item['qty'] is int
+                ? item['qty'] as int
+                : int.tryParse(item['qty'].toString()) ?? 0)),
+  );
+
+  int get inventoryValue => inventory.fold<int>(
+    0,
+    (sum, item) =>
+        sum +
+        ((item['purchase'] is int
+                ? item['purchase'] as int
+                : int.tryParse(item['purchase'].toString()) ?? 0) *
             (item['qty'] is int
                 ? item['qty'] as int
                 : int.tryParse(item['qty'].toString()) ?? 0)),

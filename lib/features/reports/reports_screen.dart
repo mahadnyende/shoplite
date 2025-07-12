@@ -296,7 +296,7 @@ class _ReportsScreenState extends State<ReportsScreen>
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 7, vsync: this);
+    _tabController = TabController(length: 10, vsync: this);
     _loadData();
   }
 
@@ -364,6 +364,372 @@ class _ReportsScreenState extends State<ReportsScreen>
     if (oldWidget.branchId != widget.branchId) {
       _loadData();
     }
+  }
+
+  Widget _buildExpensesReport() {
+    final filtered = _filterByDate(expenses, 'date');
+    final totalExpenses = filtered.fold<int>(0, (sum, e) => sum + ((e['amount'] ?? 0) as num).toInt());
+    final formatter = NumberFormat.decimalPattern();
+    return ListView(
+      padding: EdgeInsets.all(16),
+      children: [
+        Row(
+          children: [
+            Tooltip(
+              message: 'Export expenses as CSV',
+              child: ElevatedButton.icon(
+                icon: Icon(MdiIcons.download),
+                label: Text('Export CSV'),
+                onPressed: () {
+                  final rows = [
+                    ['Description', 'Date', 'Amount'],
+                    ...filtered.map((e) => [e['description'], e['date'], e['amount']]),
+                  ];
+                  _exportCSV(rows, 'expenses_report.csv');
+                },
+              ),
+            ),
+            SizedBox(width: 8),
+            Tooltip(
+              message: 'Export expenses as PDF',
+              child: ElevatedButton.icon(
+                icon: Icon(MdiIcons.filePdfBox),
+                label: Text('Export PDF'),
+                onPressed: () async {
+                  final pdf = pw.Document();
+                  final now = DateTime.now();
+                  pdf.addPage(
+                    pw.Page(
+                      margin: pw.EdgeInsets.all(32),
+                      build: (pw.Context context) => pw.Column(
+                        crossAxisAlignment: pw.CrossAxisAlignment.start,
+                        children: [
+                          pw.Text('Expenses Report', style: pw.TextStyle(fontSize: 18, fontWeight: pw.FontWeight.bold)),
+                          pw.Text('Generated: ${DateFormat('yyyy-MM-dd HH:mm').format(now)}'),
+                          pw.SizedBox(height: 12),
+                          pw.Table.fromTextArray(
+                            headers: ['Description', 'Date', 'Amount'],
+                            data: filtered.map((e) => [e['description'] ?? '', e['date'] ?? '', 'UGX ${e['amount'] ?? 0}']).toList(),
+                            headerStyle: pw.TextStyle(fontWeight: pw.FontWeight.bold, color: PdfColors.white),
+                            headerDecoration: pw.BoxDecoration(color: PdfColors.redAccent),
+                            cellAlignment: pw.Alignment.centerLeft,
+                            cellStyle: pw.TextStyle(fontSize: 10),
+                            border: pw.TableBorder.all(color: PdfColors.grey600, width: 0.5),
+                          ),
+                        ],
+                      ),
+                    ),
+                  );
+                  await Printing.sharePdf(bytes: await pdf.save(), filename: 'expenses_report.pdf');
+                },
+              ),
+            ),
+            SizedBox(width: 8),
+            Tooltip(
+              message: 'Total expenses',
+              child: Chip(
+                label: Text('UGX ${formatter.format(totalExpenses)}', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                backgroundColor: Colors.redAccent,
+                avatar: Icon(MdiIcons.cashMinus, color: Colors.white),
+              ),
+            ),
+          ],
+        ),
+        SizedBox(height: 16),
+        Card(
+          elevation: 2,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          child: Padding(
+            padding: const EdgeInsets.all(20.0),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Icon(MdiIcons.cashMinus, color: Colors.red, size: 28),
+                    SizedBox(width: 8),
+                    Text('Expenses', style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold)),
+                  ],
+                ),
+                Divider(),
+                // Column headers
+                Container(
+                  color: Theme.of(context).colorScheme.surfaceVariant.withOpacity(0.5),
+                  padding: const EdgeInsets.symmetric(vertical: 8.0, horizontal: 4),
+                  child: Row(
+                    children: [
+                      Expanded(flex: 3, child: Text('Description', style: TextStyle(fontWeight: FontWeight.bold))),
+                      Expanded(flex: 2, child: Text('Date', style: TextStyle(fontWeight: FontWeight.bold))),
+                      Expanded(flex: 2, child: Text('Amount', style: TextStyle(fontWeight: FontWeight.bold))),
+                    ],
+                  ),
+                ),
+                Divider(height: 1, thickness: 1),
+                ...filtered.map((e) => Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 8.0),
+                  child: Row(
+                    children: [
+                      Expanded(flex: 3, child: Text(e['description'] ?? '')),
+                      Expanded(flex: 2, child: Text(e['date'] ?? '')),
+                      Expanded(flex: 2, child: Text('UGX ${formatter.format(e['amount'] ?? 0)}')),
+                    ],
+                  ),
+                )),
+              ],
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildWrittenOffReport() {
+    // Placeholder: You should load written off data from DB and add to state
+    final List<Map<String, dynamic>> writtenOff = [];
+    final formatter = NumberFormat.decimalPattern();
+    final totalWrittenOff = writtenOff.fold<int>(0, (sum, w) => sum + ((
+      (w['qty'] is int ? w['qty'] as int : int.tryParse(w['qty']?.toString() ?? '') ?? 0) *
+      (w['purchase'] is int ? w['purchase'] as int : int.tryParse(w['purchase']?.toString() ?? '') ?? 0)
+    )));
+    return ListView(
+      padding: EdgeInsets.all(16),
+      children: [
+        Row(
+          children: [
+            Tooltip(
+              message: 'Export written off as CSV',
+              child: ElevatedButton.icon(
+                icon: Icon(MdiIcons.download),
+                label: Text('Export CSV'),
+                onPressed: () {
+                  final rows = [
+                    ['Item', 'Qty', 'Purchase Price', 'Total', 'Reason', 'Date'],
+                    ...writtenOff.map((w) => [w['name'], w['qty'], w['purchase'], (w['qty'] ?? 0) * (w['purchase'] ?? 0), w['reason'], w['written_off_at']]),
+                  ];
+                  _exportCSV(rows, 'written_off_report.csv');
+                },
+              ),
+            ),
+            SizedBox(width: 8),
+            Tooltip(
+              message: 'Export written off as PDF',
+              child: ElevatedButton.icon(
+                icon: Icon(MdiIcons.filePdfBox),
+                label: Text('Export PDF'),
+                onPressed: () async {
+                  final pdf = pw.Document();
+                  final now = DateTime.now();
+                  pdf.addPage(
+                    pw.Page(
+                      margin: pw.EdgeInsets.all(32),
+                      build: (pw.Context context) => pw.Column(
+                        crossAxisAlignment: pw.CrossAxisAlignment.start,
+                        children: [
+                          pw.Text('Written Off Report', style: pw.TextStyle(fontSize: 18, fontWeight: pw.FontWeight.bold)),
+                          pw.Text('Generated: ${DateFormat('yyyy-MM-dd HH:mm').format(now)}'),
+                          pw.SizedBox(height: 12),
+                          pw.Table.fromTextArray(
+                            headers: ['Item', 'Qty', 'Purchase Price', 'Total', 'Reason', 'Date'],
+                            data: writtenOff.map((w) => [w['name'] ?? '', w['qty'] ?? '', w['purchase'] ?? '', (w['qty'] ?? 0) * (w['purchase'] ?? 0), w['reason'] ?? '', w['written_off_at'] ?? '']).toList(),
+                            headerStyle: pw.TextStyle(fontWeight: pw.FontWeight.bold, color: PdfColors.white),
+                            headerDecoration: pw.BoxDecoration(color: PdfColors.orange),
+                            cellAlignment: pw.Alignment.centerLeft,
+                            cellStyle: pw.TextStyle(fontSize: 10),
+                            border: pw.TableBorder.all(color: PdfColors.grey600, width: 0.5),
+                          ),
+                        ],
+                      ),
+                    ),
+                  );
+                  await Printing.sharePdf(bytes: await pdf.save(), filename: 'written_off_report.pdf');
+                },
+              ),
+            ),
+            SizedBox(width: 8),
+            Tooltip(
+              message: 'Total written off value',
+              child: Chip(
+                label: Text('UGX ${formatter.format(totalWrittenOff)}', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                backgroundColor: Colors.orange,
+                avatar: Icon(MdiIcons.trashCanOutline, color: Colors.white),
+              ),
+            ),
+          ],
+        ),
+        SizedBox(height: 16),
+        Card(
+          elevation: 2,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          child: Padding(
+            padding: const EdgeInsets.all(20.0),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Icon(MdiIcons.trashCanOutline, color: Colors.orange, size: 28),
+                    SizedBox(width: 8),
+                    Text('Written Off', style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold)),
+                  ],
+                ),
+                Divider(),
+                // Column headers
+                Container(
+                  color: Theme.of(context).colorScheme.surfaceVariant.withOpacity(0.5),
+                  padding: const EdgeInsets.symmetric(vertical: 8.0, horizontal: 4),
+                  child: Row(
+                    children: [
+                      Expanded(flex: 2, child: Text('Item', style: TextStyle(fontWeight: FontWeight.bold))),
+                      Expanded(flex: 1, child: Text('Qty', style: TextStyle(fontWeight: FontWeight.bold))),
+                      Expanded(flex: 2, child: Text('Purchase Price', style: TextStyle(fontWeight: FontWeight.bold))),
+                      Expanded(flex: 2, child: Text('Total', style: TextStyle(fontWeight: FontWeight.bold))),
+                      Expanded(flex: 2, child: Text('Reason', style: TextStyle(fontWeight: FontWeight.bold))),
+                      Expanded(flex: 2, child: Text('Date', style: TextStyle(fontWeight: FontWeight.bold))),
+                    ],
+                  ),
+                ),
+                Divider(height: 1, thickness: 1),
+                ...writtenOff.map((w) => Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 8.0),
+                  child: Row(
+                    children: [
+                      Expanded(flex: 2, child: Text(w['name'] ?? '')),
+                      Expanded(flex: 1, child: Text(w['qty']?.toString() ?? '')),
+                      Expanded(flex: 2, child: Text('UGX ${formatter.format(w['purchase'] ?? 0)}')),
+                      Expanded(flex: 2, child: Text('UGX ${formatter.format((w['qty'] ?? 0) * (w['purchase'] ?? 0))}')),
+                      Expanded(flex: 2, child: Text(w['reason'] ?? '')),
+                      Expanded(flex: 2, child: Text(w['written_off_at'] ?? '')),
+                    ],
+                  ),
+                )),
+              ],
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildInventoryReport() {
+    final filtered = productFilter == null ? inventory : inventory.where((i) => i['name'] == productFilter).toList();
+    final formatter = NumberFormat.decimalPattern();
+    final totalValue = filtered.fold<int>(0, (sum, i) => sum + ((
+      (i['qty'] is int ? i['qty'] as int : int.tryParse(i['qty']?.toString() ?? '') ?? 0) *
+      (i['purchase'] is int ? i['purchase'] as int : int.tryParse(i['purchase']?.toString() ?? '') ?? 0)
+    )));
+    return ListView(
+      padding: EdgeInsets.all(16),
+      children: [
+        Row(
+          children: [
+            Tooltip(
+              message: 'Export inventory as CSV',
+              child: ElevatedButton.icon(
+                icon: Icon(MdiIcons.download),
+                label: Text('Export CSV'),
+                onPressed: () {
+                  final rows = [
+                    ['Item', 'Qty', 'Purchase Price', 'Total Value'],
+                    ...filtered.map((i) => [i['name'], i['qty'], i['purchase'], (i['qty'] ?? 0) * (i['purchase'] ?? 0)]),
+                  ];
+                  _exportCSV(rows, 'inventory_report.csv');
+                },
+              ),
+            ),
+            SizedBox(width: 8),
+            Tooltip(
+              message: 'Export inventory as PDF',
+              child: ElevatedButton.icon(
+                icon: Icon(MdiIcons.filePdfBox),
+                label: Text('Export PDF'),
+                onPressed: () async {
+                  final pdf = pw.Document();
+                  final now = DateTime.now();
+                  pdf.addPage(
+                    pw.Page(
+                      margin: pw.EdgeInsets.all(32),
+                      build: (pw.Context context) => pw.Column(
+                        crossAxisAlignment: pw.CrossAxisAlignment.start,
+                        children: [
+                          pw.Text('Inventory Report', style: pw.TextStyle(fontSize: 18, fontWeight: pw.FontWeight.bold)),
+                          pw.Text('Generated: ${DateFormat('yyyy-MM-dd HH:mm').format(now)}'),
+                          pw.SizedBox(height: 12),
+                          pw.Table.fromTextArray(
+                            headers: ['Item', 'Qty', 'Purchase Price', 'Total Value'],
+                            data: filtered.map((i) => [i['name'] ?? '', i['qty'] ?? '', i['purchase'] ?? '', (i['qty'] ?? 0) * (i['purchase'] ?? 0)]).toList(),
+                            headerStyle: pw.TextStyle(fontWeight: pw.FontWeight.bold, color: PdfColors.white),
+                            headerDecoration: pw.BoxDecoration(color: PdfColors.blue),
+                            cellAlignment: pw.Alignment.centerLeft,
+                            cellStyle: pw.TextStyle(fontSize: 10),
+                            border: pw.TableBorder.all(color: PdfColors.grey600, width: 0.5),
+                          ),
+                        ],
+                      ),
+                    ),
+                  );
+                  await Printing.sharePdf(bytes: await pdf.save(), filename: 'inventory_report.pdf');
+                },
+              ),
+            ),
+            SizedBox(width: 8),
+            Tooltip(
+              message: 'Total inventory value',
+              child: Chip(
+                label: Text('UGX ${formatter.format(totalValue)}', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                backgroundColor: Colors.blue,
+                avatar: Icon(MdiIcons.cube, color: Colors.white),
+              ),
+            ),
+          ],
+        ),
+        SizedBox(height: 16),
+        Card(
+          elevation: 2,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          child: Padding(
+            padding: const EdgeInsets.all(20.0),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Icon(MdiIcons.cube, color: Colors.blue, size: 28),
+                    SizedBox(width: 8),
+                    Text('Inventory', style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold)),
+                  ],
+                ),
+                Divider(),
+                // Column headers
+                Container(
+                  color: Theme.of(context).colorScheme.surfaceVariant.withOpacity(0.5),
+                  padding: const EdgeInsets.symmetric(vertical: 8.0, horizontal: 4),
+                  child: Row(
+                    children: [
+                      Expanded(flex: 3, child: Text('Item', style: TextStyle(fontWeight: FontWeight.bold))),
+                      Expanded(flex: 1, child: Text('Qty', style: TextStyle(fontWeight: FontWeight.bold))),
+                      Expanded(flex: 2, child: Text('Purchase Price', style: TextStyle(fontWeight: FontWeight.bold))),
+                      Expanded(flex: 2, child: Text('Total Value', style: TextStyle(fontWeight: FontWeight.bold))),
+                    ],
+                  ),
+                ),
+                Divider(height: 1, thickness: 1),
+                ...filtered.map((i) => Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 8.0),
+                  child: Row(
+                    children: [
+                      Expanded(flex: 3, child: Text(i['name'] ?? '')),
+                      Expanded(flex: 1, child: Text(i['qty']?.toString() ?? '')),
+                      Expanded(flex: 2, child: Text('UGX ${formatter.format(i['purchase'] ?? 0)}')),
+                      Expanded(flex: 2, child: Text('UGX ${formatter.format((i['qty'] ?? 0) * (i['purchase'] ?? 0))}')),
+                    ],
+                  ),
+                )),
+              ],
+            ),
+          ),
+        ),
+      ],
+    );
   }
 
   @override
@@ -507,6 +873,9 @@ class _ReportsScreenState extends State<ReportsScreen>
             tabs: [
               Tab(child: Text('Sales', style: TextStyle(fontWeight: FontWeight.bold))),
               Tab(child: Text('Purchases', style: TextStyle(fontWeight: FontWeight.bold))),
+              Tab(child: Text('Expenses', style: TextStyle(fontWeight: FontWeight.bold))),
+              Tab(child: Text('Written Off', style: TextStyle(fontWeight: FontWeight.bold))),
+              Tab(child: Text('Inventory', style: TextStyle(fontWeight: FontWeight.bold))),
               Tab(child: Text('Income Statement', style: TextStyle(fontWeight: FontWeight.bold))),
               Tab(child: Text('Balance Sheet', style: TextStyle(fontWeight: FontWeight.bold))),
               Tab(child: Text('Cash Flow', style: TextStyle(fontWeight: FontWeight.bold))),
@@ -523,6 +892,9 @@ class _ReportsScreenState extends State<ReportsScreen>
                     children: [
                       _buildSalesReport(),
                       _buildPurchaseReport(),
+                      _buildExpensesReport(),
+                      _buildWrittenOffReport(),
+                      _buildInventoryReport(),
                       _buildIncomeStatement(),
                       _buildBalanceSheet(),
                       _buildCashFlow(),

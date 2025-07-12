@@ -185,9 +185,97 @@ class _SalesScreenState extends State<SalesScreen> {
     );
   }
 
-  // --- Stub implementations for missing methods ---
-  Future<void> _exportSalesToPdf() async {}
-  Future<void> _exportSalesToCsv() async {}
+  // --- Implementations for export methods ---
+  Future<void> _exportSalesToPdf() async {
+    if (sales.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('No sales data to export.')),
+      );
+      return;
+    }
+    final pdf = pw.Document();
+    final now = DateTime.now();
+    final font = await PdfGoogleFonts.notoSansRegular();
+    final fontBold = await PdfGoogleFonts.notoSansBold();
+    pdf.addPage(
+      pw.Page(
+        margin: const pw.EdgeInsets.all(32),
+        theme: pw.ThemeData.withFont(base: font, bold: fontBold),
+        build: (pw.Context context) {
+          return pw.Column(
+            crossAxisAlignment: pw.CrossAxisAlignment.start,
+            children: [
+              pw.Text('Sales Report', style: pw.TextStyle(fontSize: 22, fontWeight: pw.FontWeight.bold, color: PdfColors.blue800)),
+              pw.SizedBox(height: 8),
+              pw.Text('Generated: ${DateFormat('yyyy-MM-dd HH:mm').format(now)}', style: pw.TextStyle(fontSize: 11, color: PdfColors.blueGrey700)),
+              pw.SizedBox(height: 16),
+              sales.isEmpty
+                  ? pw.Text('No sales data available.', style: pw.TextStyle(fontSize: 14, color: PdfColors.red800))
+                  : pw.Table.fromTextArray(
+                      headers: [
+                        'Invoice No.',
+                        'Date',
+                        'Customer',
+                        'Amount',
+                        'Paid',
+                        'Balance',
+                        'Payment Status',
+                      ],
+                      headerStyle: pw.TextStyle(fontWeight: pw.FontWeight.bold, color: PdfColors.white, fontSize: 11),
+                      headerDecoration: pw.BoxDecoration(color: PdfColors.blue800),
+                      cellAlignment: pw.Alignment.centerLeft,
+                      cellStyle: pw.TextStyle(fontSize: 10, color: PdfColors.blueGrey900),
+                      oddRowDecoration: pw.BoxDecoration(color: PdfColors.blue50),
+                      border: pw.TableBorder.all(color: PdfColors.blueGrey200, width: 0.5),
+                      data: sales.map((sale) => [
+                        sale['id']?.toString() ?? '',
+                        sale['date']?.toString() ?? '',
+                        sale['customer_name']?.toString() ?? '',
+                        sale['amount']?.toString() ?? '',
+                        sale['paid']?.toString() ?? '',
+                        ((sale['amount'] ?? 0) - (sale['paid'] ?? 0)).toString(),
+                        sale['payment_status']?.toString() ?? '',
+                      ]).toList(),
+                    ),
+              pw.SizedBox(height: 16),
+              pw.Divider(),
+              pw.Text('Total Sales: UGX ${sales.fold<int>(0, (sum, s) => sum + ((s['amount'] is int) ? s['amount'] as int : int.tryParse(s['amount']?.toString() ?? '') ?? 0))}', style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 12, color: PdfColors.blue800)),
+            ],
+          );
+        },
+      ),
+    );
+    await Printing.sharePdf(bytes: await pdf.save(), filename: 'sales_report.pdf');
+  }
+
+  Future<void> _exportSalesToCsv() async {
+    List<List<dynamic>> rows = [
+      [
+        'Invoice No.',
+        'Date',
+        'Customer',
+        'Amount',
+        'Paid',
+        'Balance',
+        'Payment Status',
+      ],
+      ...sales.map((sale) => [
+        sale['id']?.toString() ?? '',
+        sale['date']?.toString() ?? '',
+        sale['customer_name']?.toString() ?? '',
+        sale['amount']?.toString() ?? '',
+        sale['paid']?.toString() ?? '',
+        ((sale['amount'] ?? 0) - (sale['paid'] ?? 0)).toString(),
+        sale['payment_status']?.toString() ?? '',
+      ]),
+    ];
+    String csv = const ListToCsvConverter().convert(rows);
+    final bytes = Uint8List.fromList(csv.codeUnits);
+    final now = DateTime.now();
+    final filename = 'sales_report_${DateFormat('yyyyMMdd_HHmmss').format(now)}.csv';
+    // Use Printing.sharePdf for CSV as well (works for sharing text files)
+    await Printing.sharePdf(bytes: bytes, filename: filename);
+  }
   Future<void> _showNewSaleDialog() async {
     await showDialog(
       context: context,
@@ -284,7 +372,7 @@ class _SalesScreenState extends State<SalesScreen> {
                   ElevatedButton.icon(
                     icon: Icon(MdiIcons.filePdfBox),
                     label: Text('Export PDF'),
-                    onPressed: _exportSalesToPdf,
+                    onPressed: loading ? null : _exportSalesToPdf,
                   ),
                   SizedBox(width: 8),
                   ElevatedButton.icon(

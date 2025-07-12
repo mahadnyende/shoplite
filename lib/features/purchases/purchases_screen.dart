@@ -636,10 +636,17 @@ class _PurchasesScreenState extends State<PurchasesScreen> {
       appBar: AppBar(
         title: Text('Purchases'),
         actions: [
-          Tooltip(
-            message: 'Export Purchases List to PDF',
-            child: IconButton(
-              icon: Icon(MdiIcons.filePdfBox),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+            child: ElevatedButton.icon(
+              icon: Icon(MdiIcons.filePdfBox, color: Colors.white),
+              label: Text('Export to PDF', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.red[700],
+                elevation: 2,
+                padding: EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+              ),
               onPressed: _exportPurchasesListToPdf,
             ),
           ),
@@ -769,6 +776,82 @@ class _PurchasesScreenState extends State<PurchasesScreen> {
                               _paymentFilter = v ?? '';
                             });
                           },
+                        ),
+                      ),
+                      SizedBox(width: 8),
+                      // Date filter: From
+                      SizedBox(
+                        width: 140,
+                        child: InkWell(
+                          borderRadius: BorderRadius.circular(8),
+                          onTap: () async {
+                            final picked = await showDatePicker(
+                              context: context,
+                              initialDate: fromDate ?? DateTime.now(),
+                              firstDate: DateTime(2000),
+                              lastDate: DateTime(2100),
+                            );
+                            if (picked != null) {
+                              setState(() {
+                                fromDate = picked;
+                              });
+                            }
+                          },
+                          child: InputDecorator(
+                            decoration: InputDecoration(
+                              labelText: 'From Date',
+                              border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                              isDense: true,
+                            ),
+                            child: Row(
+                              children: [
+                                Icon(MdiIcons.calendar, size: 18),
+                                SizedBox(width: 6),
+                                Text(
+                                  fromDate != null ? DateFormat('yyyy-MM-dd').format(fromDate!) : 'Any',
+                                  style: TextStyle(fontSize: 13),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ),
+                      SizedBox(width: 8),
+                      // Date filter: To
+                      SizedBox(
+                        width: 140,
+                        child: InkWell(
+                          borderRadius: BorderRadius.circular(8),
+                          onTap: () async {
+                            final picked = await showDatePicker(
+                              context: context,
+                              initialDate: toDate ?? DateTime.now(),
+                              firstDate: DateTime(2000),
+                              lastDate: DateTime(2100),
+                            );
+                            if (picked != null) {
+                              setState(() {
+                                toDate = picked;
+                              });
+                            }
+                          },
+                          child: InputDecorator(
+                            decoration: InputDecoration(
+                              labelText: 'To Date',
+                              border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                              isDense: true,
+                            ),
+                            child: Row(
+                              children: [
+                                Icon(MdiIcons.calendar, size: 18),
+                                SizedBox(width: 6),
+                                Text(
+                                  toDate != null ? DateFormat('yyyy-MM-dd').format(toDate!) : 'Any',
+                                  style: TextStyle(fontSize: 13),
+                                ),
+                              ],
+                            ),
+                          ),
                         ),
                       ),
                       SizedBox(width: 8),

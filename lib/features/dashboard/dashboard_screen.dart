@@ -1085,7 +1085,7 @@ Widget _ReceivablesPayablesTable({
     // Business value summary
     final inventoryValue = inventory.fold<int>(
       0,
-      (sum, item) => (sum + ((item['qty'] ?? 0) * (item['sale'] ?? 0))).toInt(),
+      (sum, item) => (sum + ((item['qty'] ?? 0) * (item['purchase'] ?? 0))).toInt(),
     );
     final totalIncome = sales.fold<int>(
       0,
