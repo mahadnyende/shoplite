@@ -370,90 +370,90 @@ class _ReportsScreenState extends State<ReportsScreen>
     final filtered = _filterByDate(expenses, 'date');
     final totalExpenses = filtered.fold<int>(0, (sum, e) => sum + ((e['amount'] ?? 0) as num).toInt());
     final formatter = NumberFormat.decimalPattern();
-    return ListView(
-      padding: EdgeInsets.all(16),
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Row(
-          children: [
-            Tooltip(
-              message: 'Export expenses as CSV',
-              child: ElevatedButton.icon(
-                icon: Icon(MdiIcons.download),
-                label: Text('Export CSV'),
-                onPressed: () {
-                  final rows = [
-                    ['Description', 'Date', 'Amount'],
-                    ...filtered.map((e) => [e['description'], e['date'], e['amount']]),
-                  ];
-                  _exportCSV(rows, 'expenses_report.csv');
-                },
+        Padding(
+          padding: EdgeInsets.only(left: 16, right: 16, top: 0, bottom: 8),
+          child: Row(
+            children: [
+              Tooltip(
+                message: 'Export expenses as CSV',
+                child: ElevatedButton.icon(
+                  icon: Icon(MdiIcons.download),
+                  label: Text('Export CSV'),
+                  onPressed: () {
+                    final rows = [
+                      ['Description', 'Date', 'Amount'],
+                      ...filtered.map((e) => [e['description'], e['date'], e['amount']]),
+                    ];
+                    _exportCSV(rows, 'expenses_report.csv');
+                  },
+                ),
               ),
-            ),
-            SizedBox(width: 8),
-            Tooltip(
-              message: 'Export expenses as PDF',
-              child: ElevatedButton.icon(
-                icon: Icon(MdiIcons.filePdfBox),
-                label: Text('Export PDF'),
-                onPressed: () async {
-                  final pdf = pw.Document();
-                  final prefs = await SharedPreferences.getInstance();
-                  final businessName = prefs.getString('business_name') ?? 'Your Business Name';
-                  final businessAddress = prefs.getString('business_address') ?? '123 Business St, City, Country';
-                  final businessContact = prefs.getString('business_contact') ?? 'Contact: +123456789 | info@business.com';
-                  final now = DateTime.now();
-                  pdf.addPage(
-                    pw.Page(
-                      margin: pw.EdgeInsets.all(32),
-                      build: (pw.Context context) => pw.Column(
-                        crossAxisAlignment: pw.CrossAxisAlignment.start,
-                        children: [
-                          pw.Text(businessName, style: pw.TextStyle(fontSize: 22, fontWeight: pw.FontWeight.bold)),
-                          pw.Text(businessAddress),
-                          pw.Text(businessContact),
-                          pw.Divider(),
-                          pw.Text('Expenses Report', style: pw.TextStyle(fontSize: 18, fontWeight: pw.FontWeight.bold)),
-                          pw.Text('Generated: ${DateFormat('yyyy-MM-dd HH:mm').format(now)}'),
-                          pw.SizedBox(height: 12),
-                          pw.Table.fromTextArray(
-                            headers: ['Description', 'Date', 'Amount'],
-                            data: filtered.map((e) => [e['description'] ?? '', e['date'] ?? '', 'UGX ${e['amount'] ?? 0}']).toList(),
-                            headerStyle: pw.TextStyle(fontWeight: pw.FontWeight.bold, color: PdfColors.white),
-                            headerDecoration: pw.BoxDecoration(color: PdfColors.redAccent),
-                            cellAlignment: pw.Alignment.centerLeft,
-                            cellStyle: pw.TextStyle(fontSize: 10),
-                            border: pw.TableBorder.all(color: PdfColors.grey600, width: 0.5),
-                          ),
-                        ],
+              SizedBox(width: 8),
+              Tooltip(
+                message: 'Export expenses as PDF',
+                child: ElevatedButton.icon(
+                  icon: Icon(MdiIcons.filePdfBox),
+                  label: Text('Export PDF'),
+                  onPressed: () async {
+                    final pdf = pw.Document();
+                    final prefs = await SharedPreferences.getInstance();
+                    final businessName = prefs.getString('business_name') ?? 'Your Business Name';
+                    final businessAddress = prefs.getString('business_address') ?? '123 Business St, City, Country';
+                    final businessContact = prefs.getString('business_contact') ?? 'Contact: +123456789 | info@business.com';
+                    final now = DateTime.now();
+                    pdf.addPage(
+                      pw.Page(
+                        margin: pw.EdgeInsets.all(32),
+                        build: (pw.Context context) => pw.Column(
+                          crossAxisAlignment: pw.CrossAxisAlignment.start,
+                          children: [
+                            pw.Text(businessName, style: pw.TextStyle(fontSize: 22, fontWeight: pw.FontWeight.bold)),
+                            pw.Text(businessAddress),
+                            pw.Text(businessContact),
+                            pw.Divider(),
+                            pw.Text('Expenses Report', style: pw.TextStyle(fontSize: 18, fontWeight: pw.FontWeight.bold)),
+                            pw.Text('Generated: ${DateFormat('yyyy-MM-dd HH:mm').format(now)}'),
+                            pw.SizedBox(height: 12),
+                            pw.Table.fromTextArray(
+                              headers: ['Description', 'Date', 'Amount'],
+                              data: filtered.map((e) => [e['description'] ?? '', e['date'] ?? '', 'UGX ${e['amount'] ?? 0}']).toList(),
+                              headerStyle: pw.TextStyle(fontWeight: pw.FontWeight.bold, color: PdfColors.white),
+                              headerDecoration: pw.BoxDecoration(color: PdfColors.redAccent),
+                              cellAlignment: pw.Alignment.centerLeft,
+                              cellStyle: pw.TextStyle(fontSize: 10),
+                              border: pw.TableBorder.all(color: PdfColors.grey600, width: 0.5),
+                            ),
+                          ],
+                        ),
                       ),
-                    ),
-                  );
-                  await Printing.sharePdf(bytes: await pdf.save(), filename: 'expenses_report.pdf');
-                },
+                    );
+                    await Printing.sharePdf(bytes: await pdf.save(), filename: 'expenses_report.pdf');
+                  },
+                ),
               ),
-            ),
-            SizedBox(width: 8),
-            Tooltip(
-              message: 'Total expenses',
-              child: Chip(
-                label: Text('UGX ${formatter.format(totalExpenses)}', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
-                backgroundColor: Colors.redAccent,
-                avatar: Icon(MdiIcons.cashMinus, color: Colors.white),
+              SizedBox(width: 8),
+              Tooltip(
+                message: 'Total expenses',
+                child: Chip(
+                  label: Text('UGX ${formatter.format(totalExpenses)}', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                  backgroundColor: Colors.redAccent,
+                  avatar: Icon(MdiIcons.cashMinus, color: Colors.white),
+                ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
-        SizedBox(height: 8),
-        Card(
-          elevation: 2,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        Expanded(
           child: Padding(
             padding: const EdgeInsets.symmetric(vertical: 8.0, horizontal: 8.0),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-              // Column headers (unscrollable)
-              Container(
+                // Column headers (unscrollable)
+                Container(
                   color: Theme.of(context).colorScheme.surfaceVariant.withOpacity(0.5),
                   padding: const EdgeInsets.symmetric(vertical: 8.0, horizontal: 4),
                   child: Row(
@@ -465,8 +465,7 @@ class _ReportsScreenState extends State<ReportsScreen>
                   ),
                 ),
                 Divider(height: 1, thickness: 1),
-                SizedBox(
-                  height: 320,
+                Expanded(
                   child: ListView.builder(
                     itemCount: filtered.length,
                     itemBuilder: (context, idx) {
@@ -501,7 +500,7 @@ class _ReportsScreenState extends State<ReportsScreen>
       (w['purchase'] is int ? w['purchase'] as int : int.tryParse(w['purchase']?.toString() ?? '') ?? 0)
     )));
     return ListView(
-      padding: EdgeInsets.all(16),
+      padding: EdgeInsets.only(left: 16, right: 16, top: 0, bottom: 8),
       children: [
         Row(
           children: [
@@ -636,7 +635,7 @@ class _ReportsScreenState extends State<ReportsScreen>
       (i['purchase'] is int ? i['purchase'] as int : int.tryParse(i['purchase']?.toString() ?? '') ?? 0)
     )));
     return ListView(
-      padding: EdgeInsets.all(16),
+      padding: EdgeInsets.only(left: 16, right: 16, top: 0, bottom: 8),
       children: [
         Row(
           children: [
@@ -1096,13 +1095,14 @@ class _ReportsScreenState extends State<ReportsScreen>
           ),
         ],
       ),
+      SizedBox(height: 8),
       Card(
         elevation: 2,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(16),
         ),
         child: Padding(
-          padding: const EdgeInsets.all(20.0),
+          padding: const EdgeInsets.symmetric(vertical: 8.0, horizontal: 8.0),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
