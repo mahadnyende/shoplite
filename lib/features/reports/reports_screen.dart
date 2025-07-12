@@ -397,6 +397,10 @@ class _ReportsScreenState extends State<ReportsScreen>
                 label: Text('Export PDF'),
                 onPressed: () async {
                   final pdf = pw.Document();
+                  final prefs = await SharedPreferences.getInstance();
+                  final businessName = prefs.getString('business_name') ?? 'Your Business Name';
+                  final businessAddress = prefs.getString('business_address') ?? '123 Business St, City, Country';
+                  final businessContact = prefs.getString('business_contact') ?? 'Contact: +123456789 | info@business.com';
                   final now = DateTime.now();
                   pdf.addPage(
                     pw.Page(
@@ -404,6 +408,10 @@ class _ReportsScreenState extends State<ReportsScreen>
                       build: (pw.Context context) => pw.Column(
                         crossAxisAlignment: pw.CrossAxisAlignment.start,
                         children: [
+                          pw.Text(businessName, style: pw.TextStyle(fontSize: 22, fontWeight: pw.FontWeight.bold)),
+                          pw.Text(businessAddress),
+                          pw.Text(businessContact),
+                          pw.Divider(),
                           pw.Text('Expenses Report', style: pw.TextStyle(fontSize: 18, fontWeight: pw.FontWeight.bold)),
                           pw.Text('Generated: ${DateFormat('yyyy-MM-dd HH:mm').format(now)}'),
                           pw.SizedBox(height: 12),
@@ -435,25 +443,17 @@ class _ReportsScreenState extends State<ReportsScreen>
             ),
           ],
         ),
-        SizedBox(height: 16),
+        SizedBox(height: 8),
         Card(
           elevation: 2,
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
           child: Padding(
-            padding: const EdgeInsets.all(20.0),
+            padding: const EdgeInsets.symmetric(vertical: 8.0, horizontal: 8.0),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Row(
-                  children: [
-                    Icon(MdiIcons.cashMinus, color: Colors.red, size: 28),
-                    SizedBox(width: 8),
-                    Text('Expenses', style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold)),
-                  ],
-                ),
-                Divider(),
-                // Column headers
-                Container(
+              // Column headers (unscrollable)
+              Container(
                   color: Theme.of(context).colorScheme.surfaceVariant.withOpacity(0.5),
                   padding: const EdgeInsets.symmetric(vertical: 8.0, horizontal: 4),
                   child: Row(
@@ -465,16 +465,25 @@ class _ReportsScreenState extends State<ReportsScreen>
                   ),
                 ),
                 Divider(height: 1, thickness: 1),
-                ...filtered.map((e) => Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 8.0),
-                  child: Row(
-                    children: [
-                      Expanded(flex: 3, child: Text(e['description'] ?? '')),
-                      Expanded(flex: 2, child: Text(e['date'] ?? '')),
-                      Expanded(flex: 2, child: Text('UGX ${formatter.format(e['amount'] ?? 0)}')),
-                    ],
+                SizedBox(
+                  height: 320,
+                  child: ListView.builder(
+                    itemCount: filtered.length,
+                    itemBuilder: (context, idx) {
+                      final e = filtered[idx];
+                      return Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 8.0),
+                        child: Row(
+                          children: [
+                            Expanded(flex: 3, child: Text(e['description'] ?? '')),
+                            Expanded(flex: 2, child: Text(e['date'] ?? '')),
+                            Expanded(flex: 2, child: Text('UGX ${formatter.format(e['amount'] ?? 0)}')),
+                          ],
+                        ),
+                      );
+                    },
                   ),
-                )),
+                ),
               ],
             ),
           ),
@@ -518,6 +527,10 @@ class _ReportsScreenState extends State<ReportsScreen>
                 label: Text('Export PDF'),
                 onPressed: () async {
                   final pdf = pw.Document();
+                  final prefs = await SharedPreferences.getInstance();
+                  final businessName = prefs.getString('business_name') ?? 'Your Business Name';
+                  final businessAddress = prefs.getString('business_address') ?? '123 Business St, City, Country';
+                  final businessContact = prefs.getString('business_contact') ?? 'Contact: +123456789 | info@business.com';
                   final now = DateTime.now();
                   pdf.addPage(
                     pw.Page(
@@ -525,6 +538,10 @@ class _ReportsScreenState extends State<ReportsScreen>
                       build: (pw.Context context) => pw.Column(
                         crossAxisAlignment: pw.CrossAxisAlignment.start,
                         children: [
+                          pw.Text(businessName, style: pw.TextStyle(fontSize: 22, fontWeight: pw.FontWeight.bold)),
+                          pw.Text(businessAddress),
+                          pw.Text(businessContact),
+                          pw.Divider(),
                           pw.Text('Written Off Report', style: pw.TextStyle(fontSize: 18, fontWeight: pw.FontWeight.bold)),
                           pw.Text('Generated: ${DateFormat('yyyy-MM-dd HH:mm').format(now)}'),
                           pw.SizedBox(height: 12),
@@ -556,24 +573,16 @@ class _ReportsScreenState extends State<ReportsScreen>
             ),
           ],
         ),
-        SizedBox(height: 16),
+        SizedBox(height: 8),
         Card(
           elevation: 2,
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
           child: Padding(
-            padding: const EdgeInsets.all(20.0),
+            padding: const EdgeInsets.symmetric(vertical: 8.0, horizontal: 8.0),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Row(
-                  children: [
-                    Icon(MdiIcons.trashCanOutline, color: Colors.orange, size: 28),
-                    SizedBox(width: 8),
-                    Text('Written Off', style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold)),
-                  ],
-                ),
-                Divider(),
-                // Column headers
+                // Column headers (unscrollable)
                 Container(
                   color: Theme.of(context).colorScheme.surfaceVariant.withOpacity(0.5),
                   padding: const EdgeInsets.symmetric(vertical: 8.0, horizontal: 4),
@@ -589,19 +598,28 @@ class _ReportsScreenState extends State<ReportsScreen>
                   ),
                 ),
                 Divider(height: 1, thickness: 1),
-                ...writtenOff.map((w) => Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 8.0),
-                  child: Row(
-                    children: [
-                      Expanded(flex: 2, child: Text(w['name'] ?? '')),
-                      Expanded(flex: 1, child: Text(w['qty']?.toString() ?? '')),
-                      Expanded(flex: 2, child: Text('UGX ${formatter.format(w['purchase'] ?? 0)}')),
-                      Expanded(flex: 2, child: Text('UGX ${formatter.format((w['qty'] ?? 0) * (w['purchase'] ?? 0))}')),
-                      Expanded(flex: 2, child: Text(w['reason'] ?? '')),
-                      Expanded(flex: 2, child: Text(w['written_off_at'] ?? '')),
-                    ],
+                SizedBox(
+                  height: 320,
+                  child: ListView.builder(
+                    itemCount: writtenOff.length,
+                    itemBuilder: (context, idx) {
+                      final w = writtenOff[idx];
+                      return Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 8.0),
+                        child: Row(
+                          children: [
+                            Expanded(flex: 2, child: Text(w['name'] ?? '')),
+                            Expanded(flex: 1, child: Text(w['qty']?.toString() ?? '')),
+                            Expanded(flex: 2, child: Text('UGX ${formatter.format(w['purchase'] ?? 0)}')),
+                            Expanded(flex: 2, child: Text('UGX ${formatter.format((w['qty'] ?? 0) * (w['purchase'] ?? 0))}')),
+                            Expanded(flex: 2, child: Text(w['reason'] ?? '')),
+                            Expanded(flex: 2, child: Text(w['written_off_at'] ?? '')),
+                          ],
+                        ),
+                      );
+                    },
                   ),
-                )),
+                ),
               ],
             ),
           ),
@@ -644,6 +662,10 @@ class _ReportsScreenState extends State<ReportsScreen>
                 label: Text('Export PDF'),
                 onPressed: () async {
                   final pdf = pw.Document();
+                  final prefs = await SharedPreferences.getInstance();
+                  final businessName = prefs.getString('business_name') ?? 'Your Business Name';
+                  final businessAddress = prefs.getString('business_address') ?? '123 Business St, City, Country';
+                  final businessContact = prefs.getString('business_contact') ?? 'Contact: +123456789 | info@business.com';
                   final now = DateTime.now();
                   pdf.addPage(
                     pw.Page(
@@ -651,6 +673,10 @@ class _ReportsScreenState extends State<ReportsScreen>
                       build: (pw.Context context) => pw.Column(
                         crossAxisAlignment: pw.CrossAxisAlignment.start,
                         children: [
+                          pw.Text(businessName, style: pw.TextStyle(fontSize: 22, fontWeight: pw.FontWeight.bold)),
+                          pw.Text(businessAddress),
+                          pw.Text(businessContact),
+                          pw.Divider(),
                           pw.Text('Inventory Report', style: pw.TextStyle(fontSize: 18, fontWeight: pw.FontWeight.bold)),
                           pw.Text('Generated: ${DateFormat('yyyy-MM-dd HH:mm').format(now)}'),
                           pw.SizedBox(height: 12),
@@ -682,24 +708,16 @@ class _ReportsScreenState extends State<ReportsScreen>
             ),
           ],
         ),
-        SizedBox(height: 16),
+        SizedBox(height: 8),
         Card(
           elevation: 2,
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
           child: Padding(
-            padding: const EdgeInsets.all(20.0),
+            padding: const EdgeInsets.symmetric(vertical: 8.0, horizontal: 8.0),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Row(
-                  children: [
-                    Icon(MdiIcons.cube, color: Colors.blue, size: 28),
-                    SizedBox(width: 8),
-                    Text('Inventory', style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold)),
-                  ],
-                ),
-                Divider(),
-                // Column headers
+                // Column headers (unscrollable)
                 Container(
                   color: Theme.of(context).colorScheme.surfaceVariant.withOpacity(0.5),
                   padding: const EdgeInsets.symmetric(vertical: 8.0, horizontal: 4),
@@ -713,17 +731,26 @@ class _ReportsScreenState extends State<ReportsScreen>
                   ),
                 ),
                 Divider(height: 1, thickness: 1),
-                ...filtered.map((i) => Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 8.0),
-                  child: Row(
-                    children: [
-                      Expanded(flex: 3, child: Text(i['name'] ?? '')),
-                      Expanded(flex: 1, child: Text(i['qty']?.toString() ?? '')),
-                      Expanded(flex: 2, child: Text('UGX ${formatter.format(i['purchase'] ?? 0)}')),
-                      Expanded(flex: 2, child: Text('UGX ${formatter.format((i['qty'] ?? 0) * (i['purchase'] ?? 0))}')),
-                    ],
+                SizedBox(
+                  height: 320,
+                  child: ListView.builder(
+                    itemCount: filtered.length,
+                    itemBuilder: (context, idx) {
+                      final i = filtered[idx];
+                      return Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 8.0),
+                        child: Row(
+                          children: [
+                            Expanded(flex: 3, child: Text(i['name'] ?? '')),
+                            Expanded(flex: 1, child: Text(i['qty']?.toString() ?? '')),
+                            Expanded(flex: 2, child: Text('UGX ${formatter.format(i['purchase'] ?? 0)}')),
+                            Expanded(flex: 2, child: Text('UGX ${formatter.format((i['qty'] ?? 0) * (i['purchase'] ?? 0))}')),
+                          ],
+                        ),
+                      );
+                    },
                   ),
-                )),
+                ),
               ],
             ),
           ),
@@ -1364,13 +1391,14 @@ class _ReportsScreenState extends State<ReportsScreen>
           ),
         ],
       ),
+      SizedBox(height: 8),
       Card(
         elevation: 2,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(16),
         ),
         child: Padding(
-          padding: const EdgeInsets.all(20.0),
+          padding: const EdgeInsets.symmetric(vertical: 8.0, horizontal: 8.0),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
