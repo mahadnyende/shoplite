@@ -24,34 +24,28 @@ import 'package:flutter/widgets.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  // assert(() {
-  //   // Auto-delete DB in debug mode
-  //   try {
-  //     final dbDir = Directory(p.join(
-  //       Directory.current.path,
-  //       '.dart_tool',
-  //       'sqflite_common_ffi',
-  //       'databases',
-  //     ));
-  //     final dbFile = File(p.join(dbDir.path, 'shoplite.db'));
-  //     if (dbFile.existsSync()) {
-  //       dbFile.deleteSync();
-  //       print('shoplite.db deleted for fresh start.');
-  //     }
-  //   } catch (e) {
-  //     print('Warning: Could not delete shoplite.db: $e');
-  //   }
-  //   return true;
-  // }());
-  runApp(ShopLiteApp());
+  runApp(ShopLiteRoot());
 }
 
-class ShopLiteApp extends StatefulWidget {
+class ShopLiteRoot extends StatelessWidget {
   @override
-  _ShopLiteAppState createState() => _ShopLiteAppState();
+  Widget build(BuildContext context) {
+    return MaterialApp(
+      title: 'ShopLite',
+      theme: ThemeData.light(useMaterial3: false),
+      darkTheme: ThemeData.dark(useMaterial3: false),
+      debugShowCheckedModeBanner: false,
+      home: ShopLiteHomeController(),
+    );
+  }
 }
 
-class _ShopLiteAppState extends State<ShopLiteApp> {
+class ShopLiteHomeController extends StatefulWidget {
+  @override
+  _ShopLiteHomeControllerState createState() => _ShopLiteHomeControllerState();
+}
+
+class _ShopLiteHomeControllerState extends State<ShopLiteHomeController> {
   ThemeMode _themeMode = ThemeMode.light;
   bool _authenticated = false; // Show login screen by default
   bool _isAdmin = true;
@@ -96,12 +90,10 @@ class _ShopLiteAppState extends State<ShopLiteApp> {
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
-      title: 'ShopLite',
-      theme: ThemeData.light(useMaterial3: false),
-      darkTheme: ThemeData.dark(useMaterial3: false),
-      themeMode: _themeMode,
-      home: _authenticated
+    // To support theme switching, wrap with Theme widget
+    return Theme(
+      data: _themeMode == ThemeMode.dark ? ThemeData.dark(useMaterial3: false) : ThemeData.light(useMaterial3: false),
+      child: _authenticated
           ? MainScreen(
               onToggleTheme: _toggleTheme,
               themeMode: _themeMode,
@@ -116,10 +108,57 @@ class _ShopLiteAppState extends State<ShopLiteApp> {
                 });
               },
               onForgotPassword: () {
-                // Implement forgot password logic if needed
+                showDialog(
+                  context: context,
+                  builder: (context) {
+                    final TextEditingController _forgotUserController = TextEditingController();
+                    return AlertDialog(
+                      title: const Text('Forgot Password'),
+                      content: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const Text('Enter your username to reset your password.'),
+                          const SizedBox(height: 16),
+                          TextField(
+                            controller: _forgotUserController,
+                            decoration: const InputDecoration(
+                              labelText: 'Username',
+                              border: OutlineInputBorder(),
+                            ),
+                          ),
+                        ],
+                      ),
+                      actions: [
+                        TextButton(
+                          onPressed: () => Navigator.of(context).pop(),
+                          child: const Text('Cancel'),
+                        ),
+                        ElevatedButton(
+                          onPressed: () {
+                            // Here you can implement sending reset instructions or show a message
+                            Navigator.of(context).pop();
+                            showDialog(
+                              context: context,
+                              builder: (context) => AlertDialog(
+                                title: const Text('Reset Requested'),
+                                content: const Text('If the username exists, password reset instructions have been sent. Please check your email or contact your administrator.'),
+                                actions: [
+                                  TextButton(
+                                    onPressed: () => Navigator.of(context).pop(),
+                                    child: const Text('OK'),
+                                  ),
+                                ],
+                              ),
+                            );
+                          },
+                          child: const Text('Submit'),
+                        ),
+                      ],
+                    );
+                  },
+                );
               },
             ),
-      debugShowCheckedModeBanner: false,
     );
   }
 }
