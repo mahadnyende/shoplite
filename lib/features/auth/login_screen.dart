@@ -44,42 +44,97 @@ class _LoginScreenState extends State<LoginScreen> {
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              Text('Login', style: Theme.of(context).textTheme.headlineMedium, textAlign: TextAlign.center),
-              const SizedBox(height: 32),
-              TextField(
-                controller: _usernameController,
-                decoration: const InputDecoration(labelText: 'Username'),
-                textInputAction: TextInputAction.next,
+              // Branding/logo
+              Column(
+                children: [
+                  CircleAvatar(
+                    radius: 36,
+                    backgroundColor: Colors.blue.shade50,
+                    child: Icon(MdiIcons.storefront, size: 40, color: Colors.blue[700]),
+                  ),
+                  const SizedBox(height: 12),
+                  Text('ShopLite', style: Theme.of(context).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.bold)),
+                  const SizedBox(height: 4),
+                  Text('Sign in to your account', style: Theme.of(context).textTheme.bodyMedium?.copyWith(color: Colors.grey[700])),
+                ],
               ),
-              const SizedBox(height: 16),
-              TextField(
-                controller: _passwordController,
-                decoration: InputDecoration(
-                  labelText: 'Password',
-                  suffixIcon: IconButton(
-                    icon: Icon(_obscurePassword ? MdiIcons.eye : MdiIcons.eyeOff),
-                    onPressed: () => setState(() => _obscurePassword = !_obscurePassword),
+              const SizedBox(height: 28),
+              Card(
+                elevation: 4,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 32),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      TextField(
+                        controller: _usernameController,
+                        decoration: const InputDecoration(
+                          labelText: 'Username',
+                          prefixIcon: Icon(Icons.person),
+                          border: OutlineInputBorder(),
+                        ),
+                        textInputAction: TextInputAction.next,
+                      ),
+                      const SizedBox(height: 18),
+                      TextField(
+                        controller: _passwordController,
+                        decoration: InputDecoration(
+                          labelText: 'Password',
+                          prefixIcon: Icon(Icons.lock),
+                          border: OutlineInputBorder(),
+                          suffixIcon: IconButton(
+                            icon: Icon(_obscurePassword ? MdiIcons.eye : MdiIcons.eyeOff),
+                            onPressed: () => setState(() => _obscurePassword = !_obscurePassword),
+                          ),
+                        ),
+                        obscureText: _obscurePassword,
+                        onSubmitted: (_) => _login(),
+                      ),
+                      const SizedBox(height: 10),
+                      Align(
+                        alignment: Alignment.centerRight,
+                        child: TextButton(
+                          onPressed: _loading ? null : widget.onForgotPassword,
+                          child: const Text('Forgot Password?'),
+                        ),
+                      ),
+                      if (_error != null) ...[
+                        const SizedBox(height: 8),
+                        Text(_error!, style: const TextStyle(color: Colors.red)),
+                      ],
+                      const SizedBox(height: 22),
+                      SizedBox(
+                        height: 48,
+                        child: ElevatedButton.icon(
+                          icon: Icon(MdiIcons.login, size: 22),
+                          onPressed: _loading ? null : _login,
+                          style: ElevatedButton.styleFrom(
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                            textStyle: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                          ),
+                          label: _loading
+                              ? const SizedBox(height: 22, width: 22, child: CircularProgressIndicator(strokeWidth: 2))
+                              : const Text('Login'),
+                        ),
+                      ),
+                    ],
                   ),
                 ),
-                obscureText: _obscurePassword,
-                onSubmitted: (_) => _login(),
               ),
-              const SizedBox(height: 8),
-              Align(
-                alignment: Alignment.centerRight,
-                child: TextButton(
-                  onPressed: _loading ? null : widget.onForgotPassword,
-                  child: const Text('Forgot Password?'),
-                ),
-              ),
-              if (_error != null) ...[
-                const SizedBox(height: 8),
-                Text(_error!, style: const TextStyle(color: Colors.red)),
-              ],
-              const SizedBox(height: 24),
-              ElevatedButton(
-                onPressed: _loading ? null : _login,
-                child: _loading ? const CircularProgressIndicator() : const Text('Login'),
+              const SizedBox(height: 32),
+              // Powered by Apophen
+              Column(
+                children: [
+                  Divider(height: 32, thickness: 1, indent: 40, endIndent: 40),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Text('Powered by ', style: TextStyle(color: Colors.grey[600], fontSize: 13)),
+                      Text('Apophen', style: TextStyle(color: Colors.blue[700], fontWeight: FontWeight.bold, fontSize: 14, letterSpacing: 1)),
+                    ],
+                  ),
+                ],
               ),
             ],
           ),

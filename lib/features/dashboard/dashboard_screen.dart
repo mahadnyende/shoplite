@@ -1622,6 +1622,62 @@ Widget _ReceivablesPayablesTable({
                               ),
                             ],
                           ),
+                          SizedBox(height: 24),
+                          Text(
+                            "Monthly Summary",
+                            style: Theme.of(context).textTheme.titleMedium
+                                ?.copyWith(fontWeight: FontWeight.bold),
+                          ),
+                          SizedBox(height: 12),
+                          Builder(
+                            builder: (context) {
+                              final String currentMonth = DateFormat('yyyy-MM').format(now);
+                              int monthlySales = 0;
+                              int monthlyExpenses = 0;
+                              for (final s in sales) {
+                                if ((s['date'] ?? '').toString().startsWith(currentMonth)) {
+                                  monthlySales += (s['amount'] ?? 0) as int;
+                                }
+                              }
+                              for (final e in expenses) {
+                                if ((e['date'] ?? '').toString().startsWith(currentMonth)) {
+                                  monthlyExpenses += (e['amount'] ?? 0) as int;
+                                }
+                              }
+                              int grossProfit = monthlySales - monthlyExpenses;
+                              int netProfit = grossProfit - writtenOffValue;
+                              return Wrap(
+                                spacing: 32,
+                                runSpacing: 12,
+                                children: [
+                                  summaryInfoBox(
+                                    'Sales',
+                                    monthlySales,
+                                    MdiIcons.cashPlus,
+                                    Colors.green[700],
+                                  ),
+                                  summaryInfoBox(
+                                    'Expenses',
+                                    monthlyExpenses,
+                                    MdiIcons.cashMinus,
+                                    Colors.red[700],
+                                  ),
+                                  summaryInfoBox(
+                                    'Gross Profit',
+                                    grossProfit,
+                                    MdiIcons.trendingUp,
+                                    Colors.teal[700],
+                                  ),
+                                  summaryInfoBox(
+                                    'Net Profit',
+                                    netProfit,
+                                    MdiIcons.trendingUp,
+                                    Colors.blue[700],
+                                  ),
+                                ],
+                              );
+                            },
+                          ),
                         ],
                       ),
                     ),

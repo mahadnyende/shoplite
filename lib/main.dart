@@ -53,7 +53,7 @@ class ShopLiteApp extends StatefulWidget {
 
 class _ShopLiteAppState extends State<ShopLiteApp> {
   ThemeMode _themeMode = ThemeMode.light;
-  bool _authenticated = true; // For demo, skip login
+  bool _authenticated = false; // Show login screen by default
   bool _isAdmin = true;
 
   @override
@@ -108,9 +108,17 @@ class _ShopLiteAppState extends State<ShopLiteApp> {
               isAdmin: _isAdmin,
               onLogout: _logout,
             )
-          : Center(
-              child: Text('Login screen placeholder'),
-            ), // Replace with real login
+          : LoginScreen(
+              onLoginSuccess: () {
+                setState(() {
+                  _authenticated = true;
+                  _isAdmin = true; // Or set based on login result
+                });
+              },
+              onForgotPassword: () {
+                // Implement forgot password logic if needed
+              },
+            ),
       debugShowCheckedModeBanner: false,
     );
   }
