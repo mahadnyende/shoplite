@@ -8,7 +8,15 @@ class AppDatabase {
   static Future<Database> get database async {
     if (_db != null) return _db!;
     sqfliteFfiInit();
-    var dbPath = await databaseFactoryFfi.getDatabasesPath();
+    // Use a writable directory for the database file
+    String dbPath;
+    if (Platform.isWindows) {
+      final appData = Platform.environment['APPDATA'] ?? Directory.current.path;
+      dbPath = p.join(appData, 'ShopLite');
+      await Directory(dbPath).create(recursive: true);
+    } else {
+      dbPath = await databaseFactoryFfi.getDatabasesPath();
+    }
     final path = p.join(dbPath, 'shoplite.db');
     print('DB path: $path');
     _db = await databaseFactoryFfi.openDatabase(
