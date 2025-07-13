@@ -134,6 +134,12 @@ class _LoginScreenState extends State<LoginScreen> {
                       Text('Apophen', style: TextStyle(color: Colors.blue[700], fontWeight: FontWeight.bold, fontSize: 14, letterSpacing: 1)),
                     ],
                   ),
+                  const SizedBox(height: 8),
+                  Text(
+                    'System Version: v1.0.0',
+                    style: TextStyle(color: Colors.grey[500], fontSize: 12, fontWeight: FontWeight.w500),
+                    textAlign: TextAlign.center,
+                  ),
                 ],
               ),
             ],
