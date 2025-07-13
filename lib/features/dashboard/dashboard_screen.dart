@@ -472,6 +472,7 @@ class _DashboardOverviewState extends State<DashboardOverview> {
                           sortAscending: sortAscending,
                           verticalController: verticalController,
                           isReceivables: true,
+                          updateSort: updateSort,
                         );
                       },
                     ),
@@ -956,6 +957,7 @@ Widget _ReceivablesPayablesTable({
   required bool sortAscending,
   required ScrollController verticalController,
   required bool isReceivables,
+  void Function(int, bool)? updateSort,
 }) {
   final cellTextStyle = const TextStyle(fontSize: 12, overflow: TextOverflow.ellipsis);
   return SizedBox(
@@ -975,24 +977,30 @@ Widget _ReceivablesPayablesTable({
                 ? [
                     DataColumn(
                       label: Text('Invoice No.'),
+                      onSort: updateSort != null ? (i, asc) => updateSort(i, asc) : null,
                     ),
                     DataColumn(
                       label: Text('Customer'),
+                      onSort: updateSort != null ? (i, asc) => updateSort(i, asc) : null,
                     ),
                     DataColumn(
                       label: Text('Date'),
+                      onSort: updateSort != null ? (i, asc) => updateSort(i, asc) : null,
                     ),
                     DataColumn(
                       label: Text('Total'),
                       numeric: true,
+                      onSort: updateSort != null ? (i, asc) => updateSort(i, asc) : null,
                     ),
                     DataColumn(
                       label: Text('Paid'),
                       numeric: true,
+                      onSort: updateSort != null ? (i, asc) => updateSort(i, asc) : null,
                     ),
                     DataColumn(
                       label: Text('Balance'),
                       numeric: true,
+                      onSort: updateSort != null ? (i, asc) => updateSort(i, asc) : null,
                     ),
                     DataColumn(label: Text('Actions')),
                   ]

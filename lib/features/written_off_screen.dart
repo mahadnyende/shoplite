@@ -66,25 +66,32 @@ class _WrittenOffScreenState extends State<WrittenOffScreen> {
         branch_id INTEGER
       )
     ''');
-    String where = 'branch_id = ?';
-    List whereArgs = [_activeBranchId];
+    String where = '';
+    List whereArgs = [];
+    if (_activeBranchId != null) {
+      where = 'branch_id = ?';
+      whereArgs.add(_activeBranchId);
+    }
     if (startDate != null && endDate != null) {
-      where += ' AND written_off_at >= ? AND written_off_at <= ?';
+      if (where.isNotEmpty) where += ' AND ';
+      where += 'written_off_at >= ? AND written_off_at <= ?';
       whereArgs.addAll([
         startDate.toIso8601String(),
         endDate.add(Duration(days: 1)).toIso8601String(), // inclusive
       ]);
     } else if (startDate != null) {
-      where += ' AND written_off_at >= ?';
+      if (where.isNotEmpty) where += ' AND ';
+      where += 'written_off_at >= ?';
       whereArgs.add(startDate.toIso8601String());
     } else if (endDate != null) {
-      where += ' AND written_off_at <= ?';
+      if (where.isNotEmpty) where += ' AND ';
+      where += 'written_off_at <= ?';
       whereArgs.add(endDate.add(Duration(days: 1)).toIso8601String());
     }
     final data = await db.query(
       'written_off',
-      where: where,
-      whereArgs: whereArgs,
+      where: where.isNotEmpty ? where : null,
+      whereArgs: where.isNotEmpty ? whereArgs : null,
       orderBy: 'id DESC',
     );
     setState(() {
@@ -463,9 +470,10 @@ class _WrittenOffScreenState extends State<WrittenOffScreen> {
       ),
       appBar: AppBar(
         title: Row(
+          mainAxisSize: MainAxisSize.min,
           children: [
             Text('Written Off'),
-            Spacer(),
+            SizedBox(width: 16),
             if (!_loadingBranches && _branches.isNotEmpty)
               Container(
                 padding: EdgeInsets.symmetric(horizontal: 12, vertical: 6),
@@ -611,14 +619,6 @@ class _WrittenOffScreenState extends State<WrittenOffScreen> {
                                 child: Text(_endDate != null ? DateFormat('yyyy-MM-dd').format(_endDate!) : 'Select end date'),
                               ),
                             ),
-                          ),
-                          SizedBox(width: 8),
-                          ElevatedButton.icon(
-                            icon: Icon(MdiIcons.filter),
-                            label: Text('Filter'),
-                            onPressed: () {
-                              _loadWrittenOff(startDate: _startDate, endDate: _endDate);
-                            },
                           ),
                           SizedBox(width: 8),
                           ElevatedButton.icon(
