@@ -51,10 +51,7 @@ class _DashboardOverviewState extends State<DashboardOverview> {
   int receivables = 0;
   int payables = 0;
 
-  // Branches for switcher
-  List<Map<String, dynamic>> _branches = [];
-  int? _selectedBranchId;
-  bool _loadingBranches = true;
+  // Branch switcher state removed
 
   // 0 = Month, 1 = Week, 2 = Day
   int _growthView = 0;
@@ -63,21 +60,7 @@ class _DashboardOverviewState extends State<DashboardOverview> {
   void initState() {
     super.initState();
     _loadBusinessLogo();
-    _loadBranches();
     _loadData();
-  }
-
-  Future<void> _loadBranches() async {
-    setState(() { _loadingBranches = true; });
-    final branches = await AppDatabase.getBranches();
-    // Ensure 'All Branches' is always the first option and not duplicated
-    final allBranchesOption = {'id': null, 'name': 'All Branches'};
-    final filteredBranches = branches.where((b) => b['id'] != null).toList();
-    setState(() {
-      _branches = [allBranchesOption, ...filteredBranches];
-      _selectedBranchId = widget.activeBranchId;
-      _loadingBranches = false;
-    });
   }
 
   Future<void> _loadBusinessLogo() async {
@@ -91,7 +74,6 @@ class _DashboardOverviewState extends State<DashboardOverview> {
   void didUpdateWidget(covariant DashboardOverview oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.activeBranchId != widget.activeBranchId) {
-      _selectedBranchId = widget.activeBranchId;
       _loadData();
     }
   }
@@ -1512,45 +1494,7 @@ Widget _ReceivablesPayablesTable({
                   ),
                   SizedBox(height: 24),
                   // Branch Switcher
-                  if (_branches.isNotEmpty)
-                    Padding(
-                      padding: const EdgeInsets.only(bottom: 18.0),
-                      child: Row(
-                        children: [
-                          Text('Branch: ', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-                          SizedBox(width: 12),
-                          DropdownButton<int?>(
-                            value: _selectedBranchId,
-                            items: _branches.map((branch) {
-                              return DropdownMenuItem<int?>(
-                                value: branch['id'],
-                                child: Text(branch['name'] ?? 'Unknown'),
-                              );
-                            }).toList(),
-                            onChanged: (value) {
-                              setState(() {
-                                _selectedBranchId = value;
-                              });
-                              // Update the dashboard to show data for the selected branch (or all)
-                              Navigator.pushReplacement(
-                                context,
-                                PageRouteBuilder(
-                                  pageBuilder: (context, animation1, animation2) => DashboardOverview(
-                                    activeBranchId: value,
-                                    businessName: widget.businessName,
-                                    userName: widget.userName,
-                                    userRole: widget.userRole,
-                                    userPhotoUrl: widget.userPhotoUrl,
-                                  ),
-                                  transitionDuration: Duration.zero,
-                                  reverseTransitionDuration: Duration.zero,
-                                ),
-                              );
-                            },
-                          ),
-                        ],
-                      ),
-                    ),
+                  // Branch switcher removed
                   // Inventory Value Summary Card (single row)
                   Row(
                     children: [
